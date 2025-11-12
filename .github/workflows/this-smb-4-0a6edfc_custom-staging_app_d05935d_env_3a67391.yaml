@@ -518,7 +518,7 @@ jobs:
       - name: Select Xcode version
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.1'
+          xcode-version: '16.4'
       # - name: Check available Xcode version
       #   run: |
       #     echo "Default Xcode version:"
