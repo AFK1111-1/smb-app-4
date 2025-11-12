@@ -145,7 +145,7 @@ platform :ios do
       output_directory: "ios/build",
       derived_data_path: "ios/build/DerivedData",
       export_method: "app-store",
-      sdk: "iphoneos",
+      destination: "generic/platform=iOS",
       export_options: {
         method: "app-store",
         provisioningProfiles: {
@@ -177,7 +177,7 @@ platform :ios do
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
       export_method: "app-store",
-      sdk: "iphoneos",
+      destination: "generic/platform=iOS",
       export_options: {
         method: "app-store",
         provisioningProfiles: {
@@ -209,7 +209,7 @@ platform :ios do
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
       export_method: "app-store",
-      sdk: "iphoneos",
+      destination: "generic/platform=iOS",
       export_options: {
         method: "app-store",
         provisioningProfiles: {
@@ -243,7 +243,7 @@ platform :ios do
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
       export_method: "app-store",
-      sdk: "iphoneos",
+      destination: "generic/platform=iOS",
       export_options: {
         method: "app-store",
         provisioningProfiles: {
