@@ -1,0 +1,142 @@
+name: QA Release Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  qa-build:
+    runs-on: macos-latest # should use macos-latest when ios builds enabled
+    name: Build QA Release
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Ruby and Fastlane
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+
+      - name: Install Fastlane
+        run: |
+          gem install fastlane
+          bundle install
+
+      - name: Setup environment variables
+        run: |
+          echo "KINDE_DOMAIN=${{ vars.KINDE_DOMAIN }}" >> .env
+          echo "KINDE_CLIENT_ID=${{ vars.KINDE_CLIENT_ID }}" >> .env
+          echo "KINDE_SCOPES=${{ vars.KINDE_SCOPES }}" >> .env
+          echo "PUBLIC_API_URL=${{ vars.PUBLIC_API_URL }}" >> .env
+          echo "KINDE_AUDIENCE=${{ vars.KINDE_AUDIENCE }}" >> .env
+
+      - name: Create credentials directories
+        run: |
+          mkdir -p credentials/android
+          mkdir -p credentials/ios
+
+      - name: Setup Android Keystore from secrets
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > credentials/android/release.keystore
+
+      - name: Setup Google Play Service Key from secrets
+        run: |
+          echo '${{ secrets.GOOGLE_PLAY_SERVICE_KEY }}' > credentials/android/google-play-service-key.json
+
+      - name: Setup Apple API Key for Fastlane Match
+        run: |
+          echo '${{ secrets.FASTLANE_PASSWORD }}' > credentials/ios/AuthKey.p8
+
+      - name: Setup Google Services JSON for Android
+        run: |
+          echo "${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}" | base64 --decode > google-services.json
+
+      - name: Setup Google Service Info Plist for iOS
+        run: |
+          echo "${{ secrets.IOS_GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode > GoogleService-Info.plist
+
+      - name: Expo Prebuild
+        run: npm run prebuild --clean
+
+      - name: Build and Release Android QA
+        run: fastlane android qa_release
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.FASTLANE_MATCH_DEPLOY_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Select Xcode 16.2
+        run: |
+          echo "Available Xcode versions:"
+          ls -la /Applications/ | grep Xcode
+
+          # ✅ Select the same version you use locally
+          sudo xcode-select -s /Applications/Xcode_16.2.app
+
+          echo "Selected Xcode path:"
+          xcode-select -p
+          echo "Xcode version details:"
+          xcodebuild -version
+
+      - name: Build and Release iOS QA
+        run: fastlane ios qa_release
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+
+      - name: Upload Android Release AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      - name: Upload iOS Release IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release-ipa
+          path: ios/build/smbmobile.ipa
+          retention-days: 30
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: qa-v${{ github.run_number }}
+          release_name: QA Release v${{ github.run_number }}
+          body: |
+            ## QA Release v${{ github.run_number }}
+
+            ### 📱 Build Artifacts
+            - **🤖 Android AAB**: Download from Actions tab
+            - **🍎 iOS IPA**: Download from Actions tab
+
+            ### 📋 Build Details
+            - **Commit**: ${{ github.sha }}
+            - **Branch**: ${{ github.ref_name }}
+            - **Build Number**: ${{ github.run_number }}
+
+            ### 🚀 Next Steps
+            - Download and test the builds
+            - Promote to staging when ready
+          draft: false
+          prerelease: true
