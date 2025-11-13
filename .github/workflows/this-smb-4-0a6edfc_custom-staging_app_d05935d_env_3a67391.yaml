@@ -496,7 +496,7 @@ jobs:
       #     jq 'keys' credentials/android/google-play-service-key.json
       - name: Setup Apple API Key for Fastlane Match
         run: |
-          echo "${{ env.APP_STORE_CONNECT_API_KEY }}" | base64 --decode > credentials/ios/AuthKey.p8
+          echo '${{ env.FASTLANE_PASSWORD }}' > credentials/ios/AuthKey.p8
       # - name: Setup Google Services JSON for Android
       #   run: >
       #     echo "${{ env.ANDROID_GOOGLE_SERVICES_JSON }}" | base64 --decode >
