@@ -518,11 +518,7 @@ jobs:
       - name: Select Xcode version
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.1'
-      # - name: Select Xcode version
-      #   uses: maxim-lobanov/setup-xcode@v1
-      #   with:
-      #     xcode-version: '16.4'
+          xcode-version: '16.4'
       # - name: Check available Xcode version
       #   run: |
       #     echo "Default Xcode version:"
@@ -556,11 +552,6 @@ jobs:
           ls -la ios/smbmobile.xcodeproj/
       - name: Build and Release iOS
         run: fastlane ios release
-        env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
       # - name: Upload Android Release AAB
       #   uses: actions/upload-artifact@v4
       #   with:

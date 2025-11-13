@@ -96,6 +96,8 @@ platform :android do
 end
 
 platform :ios do
+  # Explicitly select Xcode version to avoid conflicts with multiple Xcode installations
+  # xcode_select "/Applications/Xcode16.app"
 
   desc "Build iOS simulator app for development"
   lane :dev_build do
@@ -152,7 +154,6 @@ platform :ios do
       },
       output_name: "smbmobile.ipa",
       verbose: true,
-      export_team_id: ENV['APPLE_TEAM_ID'] || "96W7U4JYV4"
     )
 
     upload_to_testflight(
@@ -184,8 +185,7 @@ platform :ios do
         }
       },
       output_directory: "ios/build",
-      output_name: "smbmobile.ipa",
-      export_team_id: ENV['APPLE_TEAM_ID'] || "96W7U4JYV4"
+      output_name: "smbmobile.ipa"
     )
 
     upload_to_testflight(
@@ -217,8 +217,7 @@ platform :ios do
         }
       },
       output_directory: "ios/build",
-      output_name: "smbmobile.ipa",
-      export_team_id: ENV['APPLE_TEAM_ID'] || "96W7U4JYV4"
+      output_name: "smbmobile.ipa"
     )
 
     upload_to_app_store(
@@ -243,6 +242,7 @@ platform :ios do
     build_ios_app(
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
+      export_team_id: "96W7U4JYV4",
       export_method: "app-store",
       destination: "generic/platform=iOS",
       export_options: {
@@ -252,8 +252,7 @@ platform :ios do
         }
       },
       output_directory: "ios/build",
-      output_name: "smbmobile.ipa",
-      export_team_id: ENV['APPLE_TEAM_ID'] || "96W7U4JYV4"
+      output_name: "smbmobile.ipa"
     )
 
     upload_to_app_store(
