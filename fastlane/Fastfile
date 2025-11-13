@@ -1,5 +1,5 @@
 # This file contains the fastlane.tools configuration
-# You can find the documentation at https://docs.fastlane.tool
+# You can find the documentation at https://docs.fastlane.tools
 
 default_platform(:android)
 
@@ -141,10 +141,12 @@ platform :ios do
     build_ios_app(
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
+      xcargs: "DEVELOPMENT_TEAM=96W7U4JYV4",  # ✅ ADDED FIX
       clean: true,
       output_directory: "ios/build",
       derived_data_path: "ios/build/DerivedData",
       export_method: "app-store",
+      export_team_id: "96W7U4JYV4",
       destination: "generic/platform=iOS",
       export_options: {
         method: "app-store",
@@ -176,7 +178,9 @@ platform :ios do
     build_ios_app(
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
+      xcargs: "DEVELOPMENT_TEAM=96W7U4JYV4",  # ✅ ADDED FIX
       export_method: "app-store",
+      export_team_id: "96W7U4JYV4",
       destination: "generic/platform=iOS",
       export_options: {
         method: "app-store",
@@ -208,7 +212,9 @@ platform :ios do
     build_ios_app(
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
+      xcargs: "DEVELOPMENT_TEAM=96W7U4JYV4",  # ✅ ADDED FIX
       export_method: "app-store",
+      export_team_id: "96W7U4JYV4",
       destination: "generic/platform=iOS",
       export_options: {
         method: "app-store",
@@ -242,6 +248,7 @@ platform :ios do
     build_ios_app(
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
+      xcargs: "DEVELOPMENT_TEAM=96W7U4JYV4",  # ✅ ADDED FIX
       export_team_id: "96W7U4JYV4",
       export_method: "app-store",
       destination: "generic/platform=iOS",
