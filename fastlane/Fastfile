@@ -129,6 +129,14 @@ platform :ios do
       force_for_new_devices: true
     )
 
+    update_project_provisioning(
+      xcodeproj: "ios/smbmobile.xcodeproj",
+      profile: "match AppStore com.insighture.smbmobile",
+      target_filter: "smbmobile",
+      export_team_id: "96W7U4JYV4",    # Use the Development Team ID from the logs: 96W7U4JYV4 [cite: 560]
+      build_configuration: "Release"
+    )
+
     # ✅ Fix for versioning
     increment_version_number(
       xcodeproj: "ios/smbmobile.xcodeproj",

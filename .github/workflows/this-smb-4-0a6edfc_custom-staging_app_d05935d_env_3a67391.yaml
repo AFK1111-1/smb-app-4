@@ -551,7 +551,7 @@ jobs:
           echo "Xcode project contents:"
           ls -la ios/smbmobile.xcodeproj/
       - name: Build and Release iOS
-        run: fastlane ios release
+        run: fastlane ios qa_release
       # - name: Upload Android Release AAB
       #   uses: actions/upload-artifact@v4
       #   with:
