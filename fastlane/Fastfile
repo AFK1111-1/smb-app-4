@@ -1,5 +1,5 @@
 # This file contains the fastlane.tools configuration
-# You can find the documentation at https://docs.fastlane.tools
+# You can find the documentation at https://docs.fastlane.tool
 
 default_platform(:android)
 
@@ -96,8 +96,6 @@ platform :android do
 end
 
 platform :ios do
-  # Explicitly select Xcode version to avoid conflicts with multiple Xcode installations
-  # xcode_select "/Applications/Xcode16.app"
 
   desc "Build iOS simulator app for development"
   lane :dev_build do
@@ -122,19 +120,11 @@ platform :ios do
 
     match(
       type: "appstore",
-      readonly: true,
+      readonly: false,
       app_identifier: "com.insighture.smbmobile",
       git_url: "git@github.com:insighture/smb-mobile-fastlane.git",
       api_key: api_key,
       force_for_new_devices: true
-    )
-
-    update_project_provisioning(
-      xcodeproj: "ios/smbmobile.xcodeproj",
-      profile: "match AppStore com.insighture.smbmobile",
-      target_filter: "smbmobile",
-      export_team_id: "96W7U4JYV4",    # Use the Development Team ID from the logs: 96W7U4JYV4 [cite: 560]
-      build_configuration: "Release"
     )
 
     # ✅ Fix for versioning
@@ -149,13 +139,10 @@ platform :ios do
     build_ios_app(
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
-      xcargs: "DEVELOPMENT_TEAM=96W7U4JYV4",  # ✅ ADDED FIX
       clean: true,
       output_directory: "ios/build",
       derived_data_path: "ios/build/DerivedData",
       export_method: "app-store",
-      export_team_id: "96W7U4JYV4",
-      destination: "generic/platform=iOS",
       export_options: {
         method: "app-store",
         provisioningProfiles: {
@@ -186,10 +173,7 @@ platform :ios do
     build_ios_app(
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
-      xcargs: "DEVELOPMENT_TEAM=96W7U4JYV4",  # ✅ ADDED FIX
       export_method: "app-store",
-      export_team_id: "96W7U4JYV4",
-      destination: "generic/platform=iOS",
       export_options: {
         method: "app-store",
         provisioningProfiles: {
@@ -220,10 +204,7 @@ platform :ios do
     build_ios_app(
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
-      xcargs: "DEVELOPMENT_TEAM=96W7U4JYV4",  # ✅ ADDED FIX
       export_method: "app-store",
-      export_team_id: "96W7U4JYV4",
-      destination: "generic/platform=iOS",
       export_options: {
         method: "app-store",
         provisioningProfiles: {
@@ -256,10 +237,7 @@ platform :ios do
     build_ios_app(
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
-      xcargs: "DEVELOPMENT_TEAM=96W7U4JYV4",  # ✅ ADDED FIX
-      export_team_id: "96W7U4JYV4",
       export_method: "app-store",
-      destination: "generic/platform=iOS",
       export_options: {
         method: "app-store",
         provisioningProfiles: {

@@ -88,7 +88,7 @@ jobs:
           ls -la /Applications/ | grep Xcode
 
           # ✅ Select the same version you use locally
-          sudo xcode-select -s /Applications/Xcode_16.2.app
+          sudo xcode-select -s /Applications/Xcode_16.1.app
 
           echo "Selected Xcode path:"
           xcode-select -p
