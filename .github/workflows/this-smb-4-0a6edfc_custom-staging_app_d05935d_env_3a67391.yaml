@@ -494,9 +494,10 @@ jobs:
       # - name: Verify JSON (optional debug)
       #   run: |
       #     jq 'keys' credentials/android/google-play-service-key.json
-      - name: Setup Apple API Key for Fastlane Match
-        run: |
-          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}" | base64 --decode > credentials/ios/AuthKey.p8
+      # Apple API Key not needed - using SSH key authentication with Match
+      # - name: Setup Apple API Key for Fastlane Match
+      #   run: |
+      #     echo "${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}" | base64 --decode > credentials/ios/AuthKey.p8
       # - name: Setup Google Services JSON for Android
       #   run: >
       #     echo "${{ env.ANDROID_GOOGLE_SERVICES_JSON }}" | base64 --decode >
@@ -565,9 +566,7 @@ jobs:
       - name: Build and Release iOS
         run: fastlane ios qa_release
         env:
-          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID || 'YX34M5D299' }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID || 'ca64e0c5-eca9-4d68-8967-a5baaf296b58' }}
-          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD || 'smb@123' }}
+          MATCH_PASSWORD: ${{ env.MATCH_PASSWORD }}
       # - name: Upload Android Release AAB
       #   uses: actions/upload-artifact@v4
       #   with:
