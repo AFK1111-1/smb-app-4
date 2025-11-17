@@ -500,10 +500,28 @@ jobs:
       #   run: >
       #     echo "${{ env.ANDROID_GOOGLE_SERVICES_JSON }}" | base64 --decode >
       #     google-services.json
+      # - name: Setup Apple API Key for Fastlane Match
+      #   run: |
+      #     # Use the raw PEM key directly from the secret, GitHub preserves newlines
+      #     echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" > credentials/ios/AuthKey.p8
+
       - name: Setup Apple API Key for Fastlane Match
         run: |
-          # Use the raw PEM key directly from the secret, GitHub preserves newlines
-          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" > credentials/ios/AuthKey.p8
+          # Write the clean PEM key
+          KEY_CONTENT="${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}"
+          echo "$KEY_CONTENT" | sed 's/^"//; s/"$//' > credentials/ios/AuthKey.p8
+
+          # --- ADD THIS SECTION FOR VERIFICATION ---
+          echo "--- Verifying Key File Format ---"
+          # Check if the file is a valid PEM private key
+          openssl pkey -in credentials/ios/AuthKey.p8 -text -noout
+          
+          # The OpenSSL command above will either:
+          # 1. Succeed, proving the file format is correct (the issue is elsewhere).
+          # 2. Fail with a specific error (e.g., "expecting private key")
+          #    which is better than the Fastlane "invalid curve name" error.
+
+
       - name: Setup Google Service Info Plist for iOS
         run: >
           echo "${{ env.IOS_GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode >
