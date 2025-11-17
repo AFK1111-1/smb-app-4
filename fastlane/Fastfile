@@ -112,14 +112,19 @@ platform :ios do
 
   desc "Submit a new QA build to TestFlight"
   lane :qa_release do
-    # Note: API key not needed for building - only for TestFlight upload
-    # Using SSH authentication for Match instead
-    
+    api_key = app_store_connect_api_key(
+      key_id: ENV['APP_STORE_CONNECT_API_KEY_ID'],
+      issuer_id: ENV['APP_STORE_CONNECT_ISSUER_ID'],
+      # key_filepath: "#{Dir.pwd}/../credentials/ios/AuthKey.p8"
+      key_filepath: "credentials/ios/AuthKey.p8"
+    )
+
     match(
       type: "appstore",
-      readonly: true,  # Changed to readonly since we're using SSH
+      readonly: false,
       app_identifier: "com.insighture.smbmobile",
       git_url: "git@github.com:insighture/smb-mobile-fastlane.git",
+      api_key: api_key,
       force_for_new_devices: true
     )
 
@@ -135,13 +140,10 @@ platform :ios do
     build_ios_app(
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
-      xcargs: "DEVELOPMENT_TEAM=96W7U4JYV4",
       clean: true,
       output_directory: "ios/build",
       derived_data_path: "ios/build/DerivedData",
       export_method: "app-store",
-      export_team_id: "96W7U4JYV4",
-      sdk: "iphoneos",
       export_options: {
         method: "app-store",
         provisioningProfiles: {
@@ -152,10 +154,9 @@ platform :ios do
       verbose: true,
     )
 
-    # TestFlight upload commented out - requires API key
-    # upload_to_testflight(
-    #   skip_waiting_for_build_processing: true
-    # )
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true
+    )
 
     changelog_from_git_commits
   end
