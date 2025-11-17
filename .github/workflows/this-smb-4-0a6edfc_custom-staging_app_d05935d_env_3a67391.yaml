@@ -483,39 +483,33 @@ jobs:
         run: |
           mkdir -p credentials/android
           mkdir -p credentials/ios
-      # ANDROID STEPS COMMENTED OUT - iOS ONLY BUILD
-      # - name: Setup Android Keystore from secrets
-      #   run: >
-      #     echo "${{ env.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode >
-      #     credentials/android/release.keystore
-      # - name: Setup Google Play Service Key
-      #   run: |
-      #     echo "$GOOGLE_PLAY_SERVICE_KEY" | base64 --decode > credentials/android/google-play-service-key.json
-      # - name: Verify JSON (optional debug)
-      #   run: |
-      #     jq 'keys' credentials/android/google-play-service-key.json
-      # Apple API Key NOT needed - using SSH key authentication with Match only
-      # The Fastfile does not use app_store_connect_api_key anymore
-      # - name: Setup Google Services JSON for Android
-      #   run: >
-      #     echo "${{ env.ANDROID_GOOGLE_SERVICES_JSON }}" | base64 --decode >
-      #     google-services.json
+      - name: Setup Android Keystore from secrets
+        run: >
+          echo "${{ env.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode >
+          credentials/android/release.keystore
+      - name: Setup Google Play Service Key from secrets
+        run: >
+          echo '${{ env.GOOGLE_PLAY_SERVICE_KEY }}' >
+          credentials/android/google-play-service-key.json
       - name: Setup Apple API Key for Fastlane Match
         run: |
-          # Use the raw PEM key directly from the secret, GitHub preserves newlines
-          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" > credentials/ios/AuthKey.p8
+          echo '${{ env.FASTLANE_PASSWORD }}' > credentials/ios/AuthKey.p8
+      - name: Setup Google Services JSON for Android
+        run: >
+          echo "${{ env.ANDROID_GOOGLE_SERVICES_JSON }}" | base64 --decode >
+          google-services.json
       - name: Setup Google Service Info Plist for iOS
         run: >
           echo "${{ env.IOS_GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode >
           GoogleService-Info.plist
-      - name: Expo Prebuild (iOS only)
-        run: npm run prebuild -- --clean --platform ios
-      # - name: Build and Release Android
-      #   run: fastlane android qa_release
+      - name: Expo Prebuild
+        run: npm run prebuild --clean
+      - name: Build and Release Android
+        run: fastlane android release
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.FASTLANE_MATCH_DEPLOY_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ env.FASTLANE_MATCH_DEPLOY_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
       - name: Select Xcode 16.2
@@ -530,53 +524,22 @@ jobs:
           xcode-select -p
           echo "Xcode version details:"
           xcodebuild -version
-      # - name: Select Xcode version
-      #   uses: maxim-lobanov/setup-xcode@v1
-      #   with:
-      #     xcode-version: '16.4'
-      # - name: Check available Xcode version
-      #   run: |
-      #     echo "Default Xcode version:"
-      #     xcodebuild -version
-      #     xcrun simctl list runtimes
-      # - name: Select Xcode 16.0
-      #   uses: maxim-lobanov/setup-xcode@v1
-      #   with:
-      #     xcode-version: '16.0'
-      # - name: Select Xcode 16.1
-      #   run: |
-      #     echo "Available Xcode versions:"
-      #     ls -la /Applications/ | grep Xcode
-
-      #     # ✅ Select the same version you use locally
-      #     # sudo xcode-select -s /Applications/Xcode_16.1.app
-      #     # sudo xcode-select -s /Applications/Xcode.app
-      #     sudo xcode-select -s /Applications/Xcode_16.0.app
-          
-      #     echo "Selected Xcode path:"
-      #     xcode-select -p
-      #     echo "Xcode version details:"
-      #     xcodebuild -version
-      # - name: Verify iOS project structure
-      #   run: |
-      #     echo "iOS project structure:"
-      #     ls -la ios/
-      #     echo "Workspace contents:"
-      #     ls -la ios/smbmobile.xcworkspace/
-      #     echo "Xcode project contents:"
-      #     ls -la ios/smbmobile.xcodeproj/
+      - name: Verify iOS project structure
+        run: |
+          echo "iOS project structure:"
+          ls -la ios/
+          echo "Workspace contents:"
+          ls -la ios/smbmobile.xcworkspace/
+          echo "Xcode project contents:"
+          ls -la ios/smbmobile.xcodeproj/
       - name: Build and Release iOS
-        run: fastlane ios qa_release
-        env:
-          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          MATCH_PASSWORD: ${{ env.MATCH_PASSWORD }}
-      # - name: Upload Android Release AAB
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: android-release-aab
-      #     path: android/app/build/outputs/bundle/release/app-release.aab
-      #     retention-days: '30'
+        run: fastlane ios release
+      - name: Upload Android Release AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: '30'
       - name: Upload iOS Release IPA
         uses: actions/upload-artifact@v4
         with:
@@ -584,12 +547,13 @@ jobs:
           path: ios/build/smbmobile.ipa
           retention-days: '30'
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: actions/create-release@v1
         with:
           body: |
-            ## iOS QA Release v${{ github.run_number }}
+            ## QA Release v${{ github.run_number }}
 
             ### 📱 Build Artifacts
+            - **🤖 Android AAB**: Download from Actions tab
             - **🍎 iOS IPA**: Download from Actions tab
 
             ### 📋 Build Details
@@ -598,13 +562,12 @@ jobs:
             - **Build Number**: ${{ github.run_number }}
 
             ### 🚀 Next Steps
-            - Download and test the iOS build
+            - Download and test the builds
             - Promote to staging when ready
           draft: false
           tag_name: qa-v${{ github.run_number }}
           prerelease: true
-          name: iOS QA Release v${{ github.run_number }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          release_name: QA Release v${{ github.run_number }}
     needs:
       - _status_testing
     permissions: write-all
@@ -783,13 +746,63 @@ jobs:
       - name: 'Run :: Pipeline Failed'
         env:
           RUN_ID: ${{ github.run_id }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          WF_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         run: |2-
 
               context=$(echo "$CONTEXT_JSON" | jq --arg sha "$COMMIT_ID" '.sha = $sha' | jq -c . | base64)
               response=$(curl -X PUT -d "runId=$RUN_ID&context=$context&appId=${{ github.event.client_payload.externalRepo.appId }}"  -H 'Authorization: ${{ env.SERVICE_ACC_ACCESS_TOKEN }}' -H 'x-organization-id: ${{ env.PIPELINE_ORGANIZATION_ID }}' -H 'x-project-id: ${{ env.PIPELINE_PROJECT_ID }}' -H 'x-environment-id: ${{ env.PIPELINE_ENVIRONMENT_ID }}' -H 'x-trace-id: ${{ env.PIPELINE_TRACE_ID }}' -H 'x-auth-by: sa' -H 'Content-Type: application/x-www-form-urlencoded'  "${{ env.PIPELINE_SERVICE_EP }}/${{ env.PIPELINE_ID }}/FAILED?releaseId=${{ github.event.client_payload.releaseData.releaseId }}")
 
+              echo "Collecting workflow status..."
+                
+              JOB_DATA=$(curl -s       -H "Authorization: Bearer $GH_TOKEN"       "https://api.github.com/repos/$REPOSITORY/actions/runs/$RUN_ID/jobs")
+                
+              # FAILED job and step
+              FAILED_JOB=$(echo "$JOB_DATA" | jq -r '
+                .jobs[] | select(.conclusion=="failure") | .name' | head -n 1)
+                
+              FAILED_STEP=$(echo "$JOB_DATA" | jq -r '
+                .jobs[].steps[] | select(.conclusion=="failure") | .name' | head -n 1)
+                
+              # CANCELLED job and step
+              CANCELLED_JOB=$(echo "$JOB_DATA" | jq -r '
+                .jobs[] | select(.conclusion=="cancelled") | .name' | head -n 1)
+                
+              CANCELLED_STEP=$(echo "$JOB_DATA" | jq -r '
+                .jobs[].steps[] | select(.conclusion=="cancelled") | .name' | head -n 1)
+                
+              FAILED_MESSAGE=""
+                
+              if [ "$WF_CONCLUSION" = "cancelled" ]; then
+                # Workflow cancelled
+                if [ -n "$CANCELLED_JOB" ] && [ -n "$CANCELLED_STEP" ]; then
+                    FAILED_MESSAGE="Workflow was cancelled while executing '$CANCELLED_STEP' step from '$CANCELLED_JOB' job"
+                else
+                    FAILED_MESSAGE="Workflow was cancelled"
+                fi
+
+              else
+                # Workflow failed
+                if [ -n "$FAILED_JOB" ] && [ -n "$FAILED_STEP" ]; then
+                    FAILED_MESSAGE="Workflow failed while executing '$FAILED_STEP' step from '$FAILED_JOB' job"
+                else
+                    FAILED_MESSAGE="Workflow failed"
+                fi
+              fi
+
+              # ALERT TITLE BUILD
+              if [ -n "${{ env.APPLICATION_NAME }}" ]; then
+                  ALERT_TITLE="${{ env.APPLICATION_NAME }} Pipeline Failed"
+              else
+                  ALERT_TITLE="Pipeline ${{ env.PIPELINE_ID }} Failed"
+              fi
+
               # Triggering SkyU Alerts
-              response=$(curl -X POST -d "labels[alertname]=pipelineFailed&labels[pipelineId]=${{ env.PIPELINE_ID }}&labels[system]=skyu&message=Pipeline Failed&messageTitle=Pipeline ${{ env.PIPELINE_ID }} Failed&status=firing"  -H 'Content-Type: application/x-www-form-urlencoded'  "${{ env.FIRE_SKYU_ALERT_EP }}?organizationId=${{ env.PIPELINE_ORGANIZATION_ID }}&projectId=${{ env.PIPELINE_PROJECT_ID }}&environmentId=${{ env.PIPELINE_ENVIRONMENT_ID }}&token=${{ env.SERVICE_ACC_ACCESS_TOKEN_STRIPPED }}&authBy=sa")
+              echo "ALERT TITLE :: $ALERT_TITLE"
+              echo "ALERT MESSAGE :: $FAILED_MESSAGE"
+
+              response=$(curl -X POST -d "labels[alertname]=pipelineFailed&labels[repository]=$REPOSITORY&labels[applicationName]=${{ env.APPLICATION_NAME }}&labels[applicationId]=${{ env.PIPELINE_APPLICATION_ID }}&labels[envLabel]=${{ env.PIPELINE_ENVIRONMENT_LABEL }}&labels[pipelineId]=${{ env.PIPELINE_ID }}&labels[system]=skyu&messageTitle=$ALERT_TITLE&message=$FAILED_MESSAGE&status=firing"  -H 'Content-Type: application/x-www-form-urlencoded'  "${{ env.FIRE_SKYU_ALERT_EP }}?organizationId=${{ env.PIPELINE_ORGANIZATION_ID }}&projectId=${{ env.PIPELINE_PROJECT_ID }}&environmentId=${{ env.PIPELINE_ENVIRONMENT_ID }}&token=${{ env.SERVICE_ACC_ACCESS_TOKEN_STRIPPED }}&authBy=sa")
 
               if echo "$response" | grep -q '"success":true'; then
                 echo "SUCCESS :: $response"
