@@ -502,7 +502,8 @@ jobs:
       #     google-services.json
       - name: Setup Apple API Key for Fastlane Match
         run: |
-          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | base64 --decode > credentials/ios/AuthKey.p8
+          # Use the raw PEM key directly from the secret, GitHub preserves newlines
+          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" > credentials/ios/AuthKey.p8
       - name: Setup Google Service Info Plist for iOS
         run: >
           echo "${{ env.IOS_GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode >
