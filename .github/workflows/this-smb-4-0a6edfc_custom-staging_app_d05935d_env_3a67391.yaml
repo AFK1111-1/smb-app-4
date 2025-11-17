@@ -509,10 +509,11 @@ jobs:
         run: |
           echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | base64 --decode > credentials/ios/AuthKey.p8
           
-      - name: Debug (partial)
+      - name: Debug Apple Key File Size
         run: |
-          DECODED=$(cat credentials/ios/AuthKey.p8)
-          echo "First 20 chars of key: ${DECODED:0:20}"
+          ls -l credentials/ios/
+          echo "File size:"
+          stat -f%z credentials/ios/AuthKey.p8
       - name: Setup Google Service Info Plist for iOS
         run: >
           echo "${{ env.IOS_GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode >
