@@ -507,15 +507,12 @@ jobs:
 
       - name: Setup Apple API Key for Fastlane Match
         run: |
-          # Use 'cat <<EOF' to reliably write the multiline PEM key.
-          cat <<EOF > credentials/ios/AuthKey.p8
-          ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
-          EOF
+          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | base64 --decode > credentials/ios/AuthKey.p8
           
-          # --- Verification Step ---
-          echo "--- Verifying Key File Format ---"
-          # This should now pass if the secret value is correct.
-          openssl pkey -in credentials/ios/AuthKey.p8 -text -noout
+      - name: Debug (partial)
+        run: |
+          DECODED=$(cat credentials/ios/AuthKey.p8)
+          echo "First 20 chars of key: ${DECODED:0:20}"
       - name: Setup Google Service Info Plist for iOS
         run: >
           echo "${{ env.IOS_GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode >
