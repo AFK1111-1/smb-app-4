@@ -581,6 +581,16 @@ jobs:
           GoogleService-Info.plist
       - name: Expo Prebuild (iOS only)
         run: npm run prebuild -- --clean --platform ios
+      
+      - name: Install CocoaPods dependencies
+        run: |
+          cd ios
+          pod install
+          cd ..
+          echo "✅ CocoaPods installation complete"
+          echo "📁 Checking for workspace file:"
+          ls -la ios/*.xcworkspace || echo "❌ Workspace not found!"
+      
       # - name: Build and Release Android
       #   run: fastlane android qa_release
       - name: Setup SSH
