@@ -178,11 +178,11 @@ platform :ios do
     )
 
     build_ios_app(
-      workspace: "ios/smbmobile.xcworkspace",
+      workspace: "./ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
       clean: true,
-      output_directory: "ios/build",
-      derived_data_path: "ios/build/DerivedData",
+      output_directory: "./ios/build",
+      derived_data_path: "./ios/build/DerivedData",
       export_method: "app-store",
       export_options: {
         method: "app-store",
