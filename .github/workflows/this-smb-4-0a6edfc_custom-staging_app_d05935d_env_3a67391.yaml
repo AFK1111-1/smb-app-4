@@ -507,21 +507,34 @@ jobs:
 
       - name: Setup Apple API Key for Fastlane Match
         run: |
-          echo "${{ env.FASTLANE_PASSWORD }}" | base64 --decode > credentials/ios/AuthKey.p8
-          
-      - name: Debug Apple Key File Size
-        run: |
-          ls -l credentials/ios/
-          echo "File size:"
-          stat -f%z credentials/ios/AuthKey.p8
-      - name: Debug encoded secret
-        run: |
-          echo "Encoded secret length (characters):"
-          echo "${{ env.FASTLANE_PASSWORD }}" | wc -c
-      - name: Decode API Key
-        run: |
           mkdir -p credentials/ios
-          echo -n "${{ env.FASTLANE_PASSWORD }}" | base64 --decode > credentials/ios/AuthKey.p8
+          echo -n "$FASTLANE_PASSWORD" | base64 --decode > credentials/ios/AuthKey.p8
+          echo "✅ AuthKey.p8 created"
+        env:
+          FASTLANE_PASSWORD: ${{ env.FASTLANE_PASSWORD }}
+          
+      - name: Debug Apple Key File
+        run: |
+          echo "📁 Checking AuthKey.p8 file:"
+          ls -lh credentials/ios/AuthKey.p8
+          echo ""
+          echo "File size: $(stat -f%z credentials/ios/AuthKey.p8) bytes"
+          echo ""
+          echo "🔍 Checking for null bytes:"
+          if grep -q $'\0' credentials/ios/AuthKey.p8; then
+            echo "❌ ERROR: File contains null bytes!"
+            hexdump -C credentials/ios/AuthKey.p8 | head -20
+          else
+            echo "✅ No null bytes found"
+          fi
+          echo ""
+          echo "🔍 File starts with (first 50 chars):"
+          head -c 50 credentials/ios/AuthKey.p8
+          echo ""
+          echo ""
+          echo "🔍 File ends with (last 50 chars):"
+          tail -c 50 credentials/ios/AuthKey.p8
+          echo ""
       - name: Setup Google Service Info Plist for iOS
         run: >
           echo "${{ env.IOS_GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode >

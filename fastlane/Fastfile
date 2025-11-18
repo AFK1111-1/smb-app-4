@@ -112,17 +112,32 @@ platform :ios do
 
   desc "Submit a new QA build to TestFlight"
   lane :qa_release do
-    # # Debug: Log environment variables
-    # UI.important "=== Environment Variables Debug ==="
-    # UI.message "APP_STORE_CONNECT_API_KEY_ID: #{ENV['APP_STORE_CONNECT_API_KEY_ID'] ? '✅ SET' : '❌ NOT SET'}"
-    # UI.message "APP_STORE_CONNECT_ISSUER_ID: #{ENV['APP_STORE_CONNECT_ISSUER_ID'] ? '✅ SET' : '❌ NOT SET'}"
-    # UI.message "MATCH_PASSWORD: #{ENV['MATCH_PASSWORD'] ? '✅ SET' : '❌ NOT SET'}"
-    # UI.message "Key file path: credentials/ios/AuthKey.p8"
-    # UI.message "Key file exists: #{File.exist?('credentials/ios/AuthKey.p8') ? '✅ YES' : '❌ NO'}"
-    # if File.exist?('credentials/ios/AuthKey.p8')
-    #   UI.message "Key file size: #{File.size('credentials/ios/AuthKey.p8')} bytes"
-    # end
-    # UI.important "==================================="
+    # Debug: Log environment variables and file
+    UI.important "=== Fastlane Environment Debug ==="
+    UI.message "APP_STORE_CONNECT_API_KEY_ID: #{ENV['APP_STORE_CONNECT_API_KEY_ID'] ? '✅ SET' : '❌ NOT SET'}"
+    UI.message "APP_STORE_CONNECT_ISSUER_ID: #{ENV['APP_STORE_CONNECT_ISSUER_ID'] ? '✅ SET' : '❌ NOT SET'}"
+    UI.message "MATCH_PASSWORD: #{ENV['MATCH_PASSWORD'] ? '✅ SET' : '❌ NOT SET'}"
+    
+    key_path = "credentials/ios/AuthKey.p8"
+    UI.message "Key file path: #{key_path}"
+    
+    if File.exist?(key_path)
+      file_size = File.size(key_path)
+      UI.message "Key file exists: ✅ YES (#{file_size} bytes)"
+      
+      # Check for null bytes
+      content = File.read(key_path)
+      if content.include?("\x00")
+        UI.error "❌ ERROR: File contains null bytes!"
+        UI.error "First 100 chars: #{content[0..100].inspect}"
+      else
+        UI.success "✅ No null bytes detected"
+        UI.message "File starts with: #{content[0..50]}"
+      end
+    else
+      UI.error "Key file exists: ❌ NO"
+    end
+    UI.important "==================================="
 
     api_key = app_store_connect_api_key(
       key_id: ENV['APP_STORE_CONNECT_API_KEY_ID'],
