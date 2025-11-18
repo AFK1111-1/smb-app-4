@@ -157,6 +157,16 @@ platform :ios do
       api_key: api_key,
       force_for_new_devices: true
     )
+    
+    # Update Xcode project with team ID and provisioning profile
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "ios/smbmobile.xcodeproj",
+      team_id: "96W7U4JYV4",
+      profile_name: "match AppStore com.insighture.smbmobile",
+      code_sign_identity: "iPhone Distribution",
+      targets: ["smbmobile"]
+    )
 
     # ✅ Fix for versioning
     increment_version_number(
