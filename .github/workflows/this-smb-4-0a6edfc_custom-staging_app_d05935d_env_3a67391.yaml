@@ -598,6 +598,25 @@ jobs:
           echo "First 50 chars: $(echo "$FASTLANE_MATCH_DEPLOY_KEY" | head -c 50)"
           echo ""
           
+          # Check if it's a public key (wrong type)
+          if echo "$FASTLANE_MATCH_DEPLOY_KEY" | grep -qE "^ssh-(rsa|ed25519|ecdsa)"; then
+            echo "❌ ERROR: FASTLANE_MATCH_DEPLOY_KEY contains a PUBLIC key!"
+            echo ""
+            echo "You have: ssh-ed25519 AAAAC3... (public key)"
+            echo "You need: -----BEGIN OPENSSH PRIVATE KEY----- ... (private key)"
+            echo ""
+            echo "The private key should be:"
+            echo "  - Multi-line format starting with -----BEGIN"
+            echo "  - Usually 1600+ characters (not 103!)"
+            echo "  - The file that pairs with your public key on GitHub"
+            echo ""
+            echo "To fix:"
+            echo "  1. Locate your SSH private key file (usually ~/.ssh/id_ed25519 or ~/.ssh/id_rsa)"
+            echo "  2. Base64 encode it: cat ~/.ssh/id_ed25519 | base64"
+            echo "  3. Update your ENCODED_PIPELINE_SECRET with the correct FASTLANE_MATCH_DEPLOY_KEY"
+            exit 1
+          fi
+          
           # Write SSH key - handle base64 or raw format
           if echo "$FASTLANE_MATCH_DEPLOY_KEY" | head -c 5 | grep -q "^-----"; then
             echo "✅ SSH key is in raw PEM format"
