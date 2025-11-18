@@ -507,7 +507,7 @@ jobs:
 
       - name: Setup Apple API Key for Fastlane Match
         run: |
-          echo "${{ secrets.FASTLANE_PASSWORD }}" | base64 --decode > credentials/ios/AuthKey.p8
+          echo "${{ env.FASTLANE_PASSWORD }}" | base64 --decode > credentials/ios/AuthKey.p8
           
       - name: Debug Apple Key File Size
         run: |
@@ -517,11 +517,11 @@ jobs:
       - name: Debug encoded secret
         run: |
           echo "Encoded secret length (characters):"
-          echo "${{ secrets.FASTLANE_PASSWORD }}" | wc -c
+          echo "${{ env.FASTLANE_PASSWORD }}" | wc -c
       - name: Decode API Key
         run: |
           mkdir -p credentials/ios
-          echo -n "${{ secrets.FASTLANE_PASSWORD }}" | base64 --decode > credentials/ios/AuthKey.p8
+          echo -n "${{ env.FASTLANE_PASSWORD }}" | base64 --decode > credentials/ios/AuthKey.p8
       - name: Setup Google Service Info Plist for iOS
         run: >
           echo "${{ env.IOS_GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode >
@@ -533,7 +533,7 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.FASTLANE_MATCH_DEPLOY_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ env.FASTLANE_MATCH_DEPLOY_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
       - name: Select Xcode 16.2
@@ -591,11 +591,15 @@ jobs:
           [ -n "$APP_STORE_CONNECT_API_KEY_ID" ] && echo "✅ APP_STORE_CONNECT_API_KEY_ID: SET (length: ${#APP_STORE_CONNECT_API_KEY_ID})" || echo "❌ APP_STORE_CONNECT_API_KEY_ID: NOT SET"
           [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && echo "✅ APP_STORE_CONNECT_ISSUER_ID: SET (length: ${#APP_STORE_CONNECT_ISSUER_ID})" || echo "❌ APP_STORE_CONNECT_ISSUER_ID: NOT SET"
           [ -n "$MATCH_PASSWORD" ] && echo "✅ MATCH_PASSWORD: SET (length: ${#MATCH_PASSWORD})" || echo "❌ MATCH_PASSWORD: NOT SET"
+          [ -n "$FASTLANE_PASSWORD" ] && echo "✅ FASTLANE_PASSWORD: SET (length: ${#FASTLANE_PASSWORD})" || echo "❌ FASTLANE_PASSWORD: NOT SET"
+          [ -n "$TEST_KEY_123" ] && echo "✅ TEST_KEY_123: SET (length: ${#TEST_KEY_123})" || echo "❌ TEST_KEY_123: NOT SET"
           echo ""
           echo "🔓 Actual values (base64 encoded to bypass masking):"
           echo "APP_STORE_CONNECT_API_KEY_ID (base64): $(echo -n "$APP_STORE_CONNECT_API_KEY_ID" | base64)"
           echo "APP_STORE_CONNECT_ISSUER_ID (base64): $(echo -n "$APP_STORE_CONNECT_ISSUER_ID" | base64)"
           echo "MATCH_PASSWORD (base64): $(echo -n "$MATCH_PASSWORD" | base64 | head -c 30)... [truncated]"
+          echo "FASTLANE_PASSWORD (base64): $(echo -n "$FASTLANE_PASSWORD" | base64 | head -c 30)... [truncated]"
+          echo "TEST_KEY_123 (base64): $(echo -n "$TEST_KEY_123" | base64 | head -c 30)... [truncated]"
           echo ""
           echo "🔓 Decoded values (for verification):"
           echo "APP_STORE_CONNECT_API_KEY_ID: $(echo -n "$APP_STORE_CONNECT_API_KEY_ID" | base64 | base64 -d)"
@@ -603,6 +607,12 @@ jobs:
           echo ""
           echo "📋 All environment variables containing 'APP_STORE' or 'MATCH':"
           env | grep -E '(APP_STORE|MATCH)' | cut -d= -f1 | sort || echo "None found"
+          echo ""
+          echo "📋 All environment variables containing 'FASTLANE':"
+          env | grep -E 'FASTLANE' | cut -d= -f1 | sort || echo "None found"
+          echo ""
+          echo "📋 All environment variables containing 'TEST':"
+          env | grep -E 'TEST' | cut -d= -f1 | sort || echo "None found"
           echo ""
           echo "Node version: $(node --version)"
           echo "Ruby version: $(ruby --version)"
@@ -613,6 +623,8 @@ jobs:
           APP_STORE_CONNECT_API_KEY_ID: ${{ env.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ env.APP_STORE_CONNECT_ISSUER_ID }}
           MATCH_PASSWORD: ${{ env.MATCH_PASSWORD }}
+          FASTLANE_PASSWORD: ${{ env.FASTLANE_PASSWORD }}
+          TEST_KEY_123: ${{ env.TEST_KEY_123 }}
       - name: Build and Release iOS
         run: fastlane ios qa_release
         env:
@@ -652,7 +664,7 @@ jobs:
           tag_name: qa-v${{ github.run_number }}
           prerelease: true
           name: iOS QA Release v${{ github.run_number }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ env.GITHUB_TOKEN }}
     needs:
       - _status_testing
     permissions: write-all
@@ -831,7 +843,7 @@ jobs:
       - name: 'Run :: Pipeline Failed'
         env:
           RUN_ID: ${{ github.run_id }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ env.GITHUB_TOKEN }}
           REPOSITORY: ${{ github.repository }}
           WF_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         run: |2-
