@@ -583,6 +583,17 @@ jobs:
       #     ls -la ios/smbmobile.xcworkspace/
       #     echo "Xcode project contents:"
       #     ls -la ios/smbmobile.xcodeproj/
+      - name: Debug - Log Environment Variables
+        run: |
+          echo "=== Environment Variables Debug ==="
+          echo "APP_STORE_CONNECT_API_KEY_ID is set: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID != '' }}"
+          echo "APP_STORE_CONNECT_ISSUER_ID is set: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID != '' }}"
+          echo "MATCH_PASSWORD is set: ${{ env.MATCH_PASSWORD != '' }}"
+          echo "Node version: $(node --version)"
+          echo "Ruby version: $(ruby --version)"
+          echo "Fastlane version: $(fastlane --version)"
+          echo "Current directory: $(pwd)"
+          echo "==================================="
       - name: Build and Release iOS
         run: fastlane ios qa_release
         env:
