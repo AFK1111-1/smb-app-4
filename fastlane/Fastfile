@@ -117,6 +117,10 @@ platform :ios do
     UI.message "APP_STORE_CONNECT_API_KEY_ID: #{ENV['APP_STORE_CONNECT_API_KEY_ID'] ? '✅ SET' : '❌ NOT SET'}"
     UI.message "APP_STORE_CONNECT_ISSUER_ID: #{ENV['APP_STORE_CONNECT_ISSUER_ID'] ? '✅ SET' : '❌ NOT SET'}"
     UI.message "MATCH_PASSWORD: #{ENV['MATCH_PASSWORD'] ? '✅ SET' : '❌ NOT SET'}"
+    if ENV['MATCH_PASSWORD']
+      UI.message "MATCH_PASSWORD length: #{ENV['MATCH_PASSWORD'].length} characters"
+      UI.message "MATCH_PASSWORD value: '#{ENV['MATCH_PASSWORD']}'"
+    end
     
     key_path = "credentials/ios/AuthKey.p8"
     UI.message "Key file path: #{key_path}"
