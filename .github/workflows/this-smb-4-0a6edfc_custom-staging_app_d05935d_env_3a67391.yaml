@@ -586,8 +586,8 @@ jobs:
       - name: Debug - Log Environment Variables
         run: |
           echo "=== Environment Variables Debug ==="
-          echo "APP_STORE_CONNECT_API_KEY_ID is set: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID != '' }}"
-          echo "APP_STORE_CONNECT_ISSUER_ID is set: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID != '' }}"
+          echo "APP_STORE_CONNECT_API_KEY_ID is set: ${{ env.APP_STORE_CONNECT_API_KEY_ID != '' }}"
+          echo "APP_STORE_CONNECT_ISSUER_ID is set: ${{ env.APP_STORE_CONNECT_ISSUER_ID != '' }}"
           echo "MATCH_PASSWORD is set: ${{ env.MATCH_PASSWORD != '' }}"
           echo "Node version: $(node --version)"
           echo "Ruby version: $(ruby --version)"
@@ -597,8 +597,8 @@ jobs:
       - name: Build and Release iOS
         run: fastlane ios qa_release
         env:
-          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ env.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ env.APP_STORE_CONNECT_ISSUER_ID }}
           MATCH_PASSWORD: ${{ env.MATCH_PASSWORD }}
       # - name: Upload Android Release AAB
       #   uses: actions/upload-artifact@v4
