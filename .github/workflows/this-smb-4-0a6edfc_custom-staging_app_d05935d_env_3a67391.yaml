@@ -535,30 +535,28 @@ jobs:
         run: |
           mkdir -p credentials/ios
           
-          # Check if FASTLANE_PASSWORD looks like raw PEM (starts with -----)
-          if echo "$FASTLANE_PASSWORD" | head -c 5 | grep -q "^-----"; then
-            echo "✅ FASTLANE_PASSWORD is raw PEM format, writing directly"
-            echo "$FASTLANE_PASSWORD" > credentials/ios/AuthKey.p8.tmp
-          else
-            echo "📝 FASTLANE_PASSWORD is base64 encoded, decoding..."
-            echo -n "$FASTLANE_PASSWORD" | base64 --decode > credentials/ios/AuthKey.p8.tmp
+          echo "🔧 Processing FASTLANE_PASSWORD and formatting .p8 file..."
+          
+          # Extract base64 content: remove the PEM headers and all spaces/newlines
+          # This handles both single-line and multi-line PEM formats
+          base64_content=$(echo "$FASTLANE_PASSWORD" | \
+            sed 's/-----BEGIN PRIVATE KEY-----//g' | \
+            sed 's/-----END PRIVATE KEY-----//g' | \
+            tr -d ' \n\r\t')
+          
+          echo "📊 Extracted base64 content length: ${#base64_content} characters"
+          
+          if [ ${#base64_content} -lt 100 ]; then
+            echo "❌ ERROR: Base64 content too short (${#base64_content} chars), expected ~200+ chars"
+            echo "First 100 chars of FASTLANE_PASSWORD:"
+            echo "$FASTLANE_PASSWORD" | head -c 100
+            exit 1
           fi
-          
-          # Fix: Remove spaces from base64 content and format properly
-          echo "🔧 Formatting .p8 file properly..."
-          
-          # Extract just the base64 content (between headers)
-          base64_content=$(sed -n '/BEGIN PRIVATE KEY/,/END PRIVATE KEY/p' credentials/ios/AuthKey.p8.tmp | \
-            grep -v "BEGIN PRIVATE KEY" | \
-            grep -v "END PRIVATE KEY" | \
-            tr -d ' \n')
           
           # Write properly formatted .p8 file
           echo "-----BEGIN PRIVATE KEY-----" > credentials/ios/AuthKey.p8
           echo "$base64_content" | fold -w 64 >> credentials/ios/AuthKey.p8
           echo "-----END PRIVATE KEY-----" >> credentials/ios/AuthKey.p8
-          
-          rm credentials/ios/AuthKey.p8.tmp
           
           echo "✅ AuthKey.p8 created at: $(pwd)/credentials/ios/AuthKey.p8"
         env:
