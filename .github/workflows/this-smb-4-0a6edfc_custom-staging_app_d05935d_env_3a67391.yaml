@@ -569,21 +569,12 @@ jobs:
           echo ""
           echo "File size: $(stat -f%z credentials/ios/AuthKey.p8) bytes"
           echo ""
-          echo "🔍 Checking for null bytes:"
-          if grep -q $'\0' credentials/ios/AuthKey.p8; then
-            echo "❌ ERROR: File contains null bytes!"
-            hexdump -C credentials/ios/AuthKey.p8 | head -20
-          else
-            echo "✅ No null bytes found"
-          fi
+          echo "🔍 File preview:"
+          head -n 3 credentials/ios/AuthKey.p8
+          echo "... [content] ..."
+          tail -n 1 credentials/ios/AuthKey.p8
           echo ""
-          echo "🔍 File starts with (first 50 chars):"
-          head -c 50 credentials/ios/AuthKey.p8
-          echo ""
-          echo ""
-          echo "🔍 File ends with (last 50 chars):"
-          tail -c 50 credentials/ios/AuthKey.p8
-          echo ""
+          echo "✅ AuthKey.p8 file created successfully"
       - name: Setup Google Service Info Plist for iOS
         run: >
           echo "${{ env.IOS_GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode >
@@ -595,9 +586,34 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ env.FASTLANE_MATCH_DEPLOY_KEY }}" > ~/.ssh/id_rsa
+          
+          # Debug SSH key
+          echo "🔍 Checking FASTLANE_MATCH_DEPLOY_KEY:"
+          if [ -z "$FASTLANE_MATCH_DEPLOY_KEY" ]; then
+            echo "❌ ERROR: FASTLANE_MATCH_DEPLOY_KEY is not set!"
+            exit 1
+          fi
+          
+          echo "SSH key length: ${#FASTLANE_MATCH_DEPLOY_KEY} characters"
+          echo "First 50 chars: $(echo "$FASTLANE_MATCH_DEPLOY_KEY" | head -c 50)"
+          echo ""
+          
+          # Write SSH key - handle base64 or raw format
+          if echo "$FASTLANE_MATCH_DEPLOY_KEY" | head -c 5 | grep -q "^-----"; then
+            echo "✅ SSH key is in raw PEM format"
+            echo "$FASTLANE_MATCH_DEPLOY_KEY" > ~/.ssh/id_rsa
+          else
+            echo "📝 SSH key is base64 encoded, decoding..."
+            echo "$FASTLANE_MATCH_DEPLOY_KEY" | base64 --decode > ~/.ssh/id_rsa
+          fi
+          
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
+          
+          echo "✅ SSH key installed"
+          echo "SSH key file size: $(stat -f%z ~/.ssh/id_rsa) bytes"
+        env:
+          FASTLANE_MATCH_DEPLOY_KEY: ${{ env.FASTLANE_MATCH_DEPLOY_KEY }}
       - name: Select Xcode 16.2
         run: |
           echo "Available Xcode versions:"
