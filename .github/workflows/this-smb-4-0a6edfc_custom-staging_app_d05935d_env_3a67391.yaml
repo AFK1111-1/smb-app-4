@@ -483,35 +483,156 @@ jobs:
         run: |
           mkdir -p credentials/android
           mkdir -p credentials/ios
-      - name: Setup Android Keystore from secrets
-        run: >
-          echo "${{ env.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode >
-          credentials/android/release.keystore
-      - name: Setup Google Play Service Key from secrets
-        run: >
-          echo '${{ env.GOOGLE_PLAY_SERVICE_KEY }}' >
-          credentials/android/google-play-service-key.json
+      # ANDROID STEPS COMMENTED OUT - iOS ONLY BUILD
+      # - name: Setup Android Keystore from secrets
+      #   run: >
+      #     echo "${{ env.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode >
+      #     credentials/android/release.keystore
+      # - name: Setup Google Play Service Key
+      #   run: |
+      #     echo "$GOOGLE_PLAY_SERVICE_KEY" | base64 --decode > credentials/android/google-play-service-key.json
+      # - name: Verify JSON (optional debug)
+      #   run: |
+      #     jq 'keys' credentials/android/google-play-service-key.json
+      # Apple API Key NOT needed - using SSH key authentication with Match only
+      # The Fastfile does not use app_store_connect_api_key anymore
+      # - name: Setup Google Services JSON for Android
+      #   run: >
+      #     echo "${{ env.ANDROID_GOOGLE_SERVICES_JSON }}" | base64 --decode >
+      #     google-services.json
+      # - name: Setup Apple API Key for Fastlane Match
+      #   run: |
+      #     # Use the raw PEM key directly from the secret, GitHub preserves newlines
+      #     echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" > credentials/ios/AuthKey.p8
+
+      - name: Debug FASTLANE_PASSWORD Before Decode
+        run: |
+          echo "🔍 Checking FASTLANE_PASSWORD variable:"
+          echo "Length: ${#FASTLANE_PASSWORD} characters"
+          echo ""
+          echo "First 100 chars of FASTLANE_PASSWORD:"
+          echo "$FASTLANE_PASSWORD" | head -c 100
+          echo ""
+          echo ""
+          echo "Checking if it's already valid base64:"
+          if echo "$FASTLANE_PASSWORD" | base64 -d > /dev/null 2>&1; then
+            echo "✅ Valid base64 string"
+            echo ""
+            echo "Decoded first 50 chars:"
+            echo "$FASTLANE_PASSWORD" | base64 -d | head -c 50
+            echo ""
+          else
+            echo "❌ NOT valid base64 - might already be decoded!"
+            echo ""
+            echo "Treating as raw content, first 50 chars:"
+            echo "$FASTLANE_PASSWORD" | head -c 50
+            echo ""
+          fi
+        env:
+          FASTLANE_PASSWORD: ${{ env.FASTLANE_PASSWORD }}
+          
       - name: Setup Apple API Key for Fastlane Match
         run: |
-          echo '${{ env.FASTLANE_PASSWORD }}' > credentials/ios/AuthKey.p8
-      - name: Setup Google Services JSON for Android
-        run: >
-          echo "${{ env.ANDROID_GOOGLE_SERVICES_JSON }}" | base64 --decode >
-          google-services.json
+          mkdir -p credentials/ios
+          
+          echo "🔧 Processing FASTLANE_PASSWORD and formatting .p8 file..."
+          
+          # Extract base64 content: remove the PEM headers and all spaces/newlines
+          # This handles both single-line and multi-line PEM formats
+          base64_content=$(echo "$FASTLANE_PASSWORD" | \
+            sed 's/-----BEGIN PRIVATE KEY-----//g' | \
+            sed 's/-----END PRIVATE KEY-----//g' | \
+            tr -d ' \n\r\t')
+          
+          echo "📊 Extracted base64 content length: ${#base64_content} characters"
+          
+          if [ ${#base64_content} -lt 100 ]; then
+            echo "❌ ERROR: Base64 content too short (${#base64_content} chars), expected ~200+ chars"
+            echo "First 100 chars of FASTLANE_PASSWORD:"
+            echo "$FASTLANE_PASSWORD" | head -c 100
+            exit 1
+          fi
+          
+          # Write properly formatted .p8 file
+          echo "-----BEGIN PRIVATE KEY-----" > credentials/ios/AuthKey.p8
+          echo "$base64_content" | fold -w 64 >> credentials/ios/AuthKey.p8
+          echo "-----END PRIVATE KEY-----" >> credentials/ios/AuthKey.p8
+          
+          echo "✅ AuthKey.p8 created at: $(pwd)/credentials/ios/AuthKey.p8"
+        env:
+          FASTLANE_PASSWORD: ${{ env.FASTLANE_PASSWORD }}
+          
+      - name: Debug Apple Key File
+        run: |
+          echo "📁 Checking AuthKey.p8 file:"
+          ls -lh credentials/ios/AuthKey.p8
+          echo ""
+          echo "File size: $(stat -f%z credentials/ios/AuthKey.p8) bytes"
+          echo ""
+          echo "🔍 File preview:"
+          head -n 3 credentials/ios/AuthKey.p8
+          echo "... [content] ..."
+          tail -n 1 credentials/ios/AuthKey.p8
+          echo ""
+          echo "✅ AuthKey.p8 file created successfully"
       - name: Setup Google Service Info Plist for iOS
         run: >
           echo "${{ env.IOS_GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode >
           GoogleService-Info.plist
-      - name: Expo Prebuild
-        run: npm run prebuild --clean
-      - name: Build and Release Android
-        run: fastlane android release
+      - name: Expo Prebuild (iOS only)
+        run: npm run prebuild -- --clean --platform ios
+      # - name: Build and Release Android
+      #   run: fastlane android qa_release
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ env.FASTLANE_MATCH_DEPLOY_KEY }}" > ~/.ssh/id_rsa
+          
+          # Debug SSH key
+          echo "🔍 Checking FASTLANE_MATCH_DEPLOY_KEY:"
+          if [ -z "$FASTLANE_MATCH_DEPLOY_KEY" ]; then
+            echo "❌ ERROR: FASTLANE_MATCH_DEPLOY_KEY is not set!"
+            exit 1
+          fi
+          
+          echo "SSH key length: ${#FASTLANE_MATCH_DEPLOY_KEY} characters"
+          echo "First 50 chars: $(echo "$FASTLANE_MATCH_DEPLOY_KEY" | head -c 50)"
+          echo ""
+          
+          # Check if it's a public key (wrong type)
+          if echo "$FASTLANE_MATCH_DEPLOY_KEY" | grep -qE "^ssh-(rsa|ed25519|ecdsa)"; then
+            echo "❌ ERROR: FASTLANE_MATCH_DEPLOY_KEY contains a PUBLIC key!"
+            echo ""
+            echo "You have: ssh-ed25519 AAAAC3... (public key)"
+            echo "You need: -----BEGIN OPENSSH PRIVATE KEY----- ... (private key)"
+            echo ""
+            echo "The private key should be:"
+            echo "  - Multi-line format starting with -----BEGIN"
+            echo "  - Usually 1600+ characters (not 103!)"
+            echo "  - The file that pairs with your public key on GitHub"
+            echo ""
+            echo "To fix:"
+            echo "  1. Locate your SSH private key file (usually ~/.ssh/id_ed25519 or ~/.ssh/id_rsa)"
+            echo "  2. Base64 encode it: cat ~/.ssh/id_ed25519 | base64"
+            echo "  3. Update your ENCODED_PIPELINE_SECRET with the correct FASTLANE_MATCH_DEPLOY_KEY"
+            exit 1
+          fi
+          
+          # Write SSH key - handle base64 or raw format
+          if echo "$FASTLANE_MATCH_DEPLOY_KEY" | head -c 5 | grep -q "^-----"; then
+            echo "✅ SSH key is in raw PEM format"
+            echo "$FASTLANE_MATCH_DEPLOY_KEY" > ~/.ssh/id_rsa
+          else
+            echo "📝 SSH key is base64 encoded, decoding..."
+            echo "$FASTLANE_MATCH_DEPLOY_KEY" | base64 --decode > ~/.ssh/id_rsa
+          fi
+          
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
+          
+          echo "✅ SSH key installed"
+          echo "SSH key file size: $(stat -f%z ~/.ssh/id_rsa) bytes"
+        env:
+          FASTLANE_MATCH_DEPLOY_KEY: ${{ env.FASTLANE_MATCH_DEPLOY_KEY }}
       - name: Select Xcode 16.2
         run: |
           echo "Available Xcode versions:"
@@ -524,22 +645,95 @@ jobs:
           xcode-select -p
           echo "Xcode version details:"
           xcodebuild -version
-      - name: Verify iOS project structure
+      # - name: Select Xcode version
+      #   uses: maxim-lobanov/setup-xcode@v1
+      #   with:
+      #     xcode-version: '16.4'
+      # - name: Check available Xcode version
+      #   run: |
+      #     echo "Default Xcode version:"
+      #     xcodebuild -version
+      #     xcrun simctl list runtimes
+      # - name: Select Xcode 16.0
+      #   uses: maxim-lobanov/setup-xcode@v1
+      #   with:
+      #     xcode-version: '16.0'
+      # - name: Select Xcode 16.1
+      #   run: |
+      #     echo "Available Xcode versions:"
+      #     ls -la /Applications/ | grep Xcode
+
+      #     # ✅ Select the same version you use locally
+      #     # sudo xcode-select -s /Applications/Xcode_16.1.app
+      #     # sudo xcode-select -s /Applications/Xcode.app
+      #     sudo xcode-select -s /Applications/Xcode_16.0.app
+          
+      #     echo "Selected Xcode path:"
+      #     xcode-select -p
+      #     echo "Xcode version details:"
+      #     xcodebuild -version
+      # - name: Verify iOS project structure
+      #   run: |
+      #     echo "iOS project structure:"
+      #     ls -la ios/
+      #     echo "Workspace contents:"
+      #     ls -la ios/smbmobile.xcworkspace/
+      #     echo "Xcode project contents:"
+      #     ls -la ios/smbmobile.xcodeproj/
+      - name: Debug - Log Environment Variables
         run: |
-          echo "iOS project structure:"
-          ls -la ios/
-          echo "Workspace contents:"
-          ls -la ios/smbmobile.xcworkspace/
-          echo "Xcode project contents:"
-          ls -la ios/smbmobile.xcodeproj/
+          echo "=== Environment Variables Debug ==="
+          echo ""
+          echo "🔍 Checking if variables are set in shell:"
+          [ -n "$APP_STORE_CONNECT_API_KEY_ID" ] && echo "✅ APP_STORE_CONNECT_API_KEY_ID: SET (length: ${#APP_STORE_CONNECT_API_KEY_ID})" || echo "❌ APP_STORE_CONNECT_API_KEY_ID: NOT SET"
+          [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && echo "✅ APP_STORE_CONNECT_ISSUER_ID: SET (length: ${#APP_STORE_CONNECT_ISSUER_ID})" || echo "❌ APP_STORE_CONNECT_ISSUER_ID: NOT SET"
+          [ -n "$MATCH_PASSWORD" ] && echo "✅ MATCH_PASSWORD: SET (length: ${#MATCH_PASSWORD})" || echo "❌ MATCH_PASSWORD: NOT SET"
+          [ -n "$FASTLANE_PASSWORD" ] && echo "✅ FASTLANE_PASSWORD: SET (length: ${#FASTLANE_PASSWORD})" || echo "❌ FASTLANE_PASSWORD: NOT SET"
+          [ -n "$TEST_KEY_123" ] && echo "✅ TEST_KEY_123: SET (length: ${#TEST_KEY_123})" || echo "❌ TEST_KEY_123: NOT SET"
+          echo ""
+          echo "🔓 Actual values (base64 encoded to bypass masking):"
+          echo "APP_STORE_CONNECT_API_KEY_ID (base64): $(echo -n "$APP_STORE_CONNECT_API_KEY_ID" | base64)"
+          echo "APP_STORE_CONNECT_ISSUER_ID (base64): $(echo -n "$APP_STORE_CONNECT_ISSUER_ID" | base64)"
+          echo "MATCH_PASSWORD (base64): $(echo -n "$MATCH_PASSWORD" | base64 | head -c 30)... [truncated]"
+          echo "FASTLANE_PASSWORD (base64): $(echo -n "$FASTLANE_PASSWORD" | base64 | head -c 30)... [truncated]"
+          echo "TEST_KEY_123 (base64): $(echo -n "$TEST_KEY_123" | base64 | head -c 30)... [truncated]"
+          echo ""
+          echo "🔓 Decoded values (for verification):"
+          echo "APP_STORE_CONNECT_API_KEY_ID: $(echo -n "$APP_STORE_CONNECT_API_KEY_ID" | base64 | base64 -d)"
+          echo "APP_STORE_CONNECT_ISSUER_ID: $(echo -n "$APP_STORE_CONNECT_ISSUER_ID" | base64 | base64 -d)"
+          echo ""
+          echo "📋 All environment variables containing 'APP_STORE' or 'MATCH':"
+          env | grep -E '(APP_STORE|MATCH)' | cut -d= -f1 | sort || echo "None found"
+          echo ""
+          echo "📋 All environment variables containing 'FASTLANE':"
+          env | grep -E 'FASTLANE' | cut -d= -f1 | sort || echo "None found"
+          echo ""
+          echo "📋 All environment variables containing 'TEST':"
+          env | grep -E 'TEST' | cut -d= -f1 | sort || echo "None found"
+          echo ""
+          echo "Node version: $(node --version)"
+          echo "Ruby version: $(ruby --version)"
+          echo "Fastlane version: $(fastlane --version)"
+          echo "Current directory: $(pwd)"
+          echo "==================================="
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ env.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ env.APP_STORE_CONNECT_ISSUER_ID }}
+          MATCH_PASSWORD: ${{ env.MATCH_PASSWORD }}
+          FASTLANE_PASSWORD: ${{ env.FASTLANE_PASSWORD }}
+          TEST_KEY_123: ${{ env.TEST_KEY_123 }}
       - name: Build and Release iOS
-        run: fastlane ios release
-      - name: Upload Android Release AAB
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-release-aab
-          path: android/app/build/outputs/bundle/release/app-release.aab
-          retention-days: '30'
+        run: fastlane ios qa_release
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ env.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ env.APP_STORE_CONNECT_ISSUER_ID }}
+          MATCH_PASSWORD: ${{ env.MATCH_PASSWORD }}
+      # - name: Upload Android Release AAB
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: android-release-aab
+      #     path: android/app/build/outputs/bundle/release/app-release.aab
+      #     retention-days: '30'
       - name: Upload iOS Release IPA
         uses: actions/upload-artifact@v4
         with:
@@ -547,13 +741,12 @@ jobs:
           path: ios/build/smbmobile.ipa
           retention-days: '30'
       - name: Create GitHub Release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v1
         with:
           body: |
-            ## QA Release v${{ github.run_number }}
+            ## iOS QA Release v${{ github.run_number }}
 
             ### 📱 Build Artifacts
-            - **🤖 Android AAB**: Download from Actions tab
             - **🍎 iOS IPA**: Download from Actions tab
 
             ### 📋 Build Details
@@ -562,12 +755,13 @@ jobs:
             - **Build Number**: ${{ github.run_number }}
 
             ### 🚀 Next Steps
-            - Download and test the builds
+            - Download and test the iOS build
             - Promote to staging when ready
           draft: false
           tag_name: qa-v${{ github.run_number }}
           prerelease: true
-          release_name: QA Release v${{ github.run_number }}
+          name: iOS QA Release v${{ github.run_number }}
+          token: ${{ env.GITHUB_TOKEN }}
     needs:
       - _status_testing
     permissions: write-all
@@ -746,7 +940,7 @@ jobs:
       - name: 'Run :: Pipeline Failed'
         env:
           RUN_ID: ${{ github.run_id }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ env.GITHUB_TOKEN }}
           REPOSITORY: ${{ github.repository }}
           WF_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         run: |2-
