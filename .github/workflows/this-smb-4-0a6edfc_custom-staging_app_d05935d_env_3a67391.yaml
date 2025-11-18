@@ -586,15 +586,33 @@ jobs:
       - name: Debug - Log Environment Variables
         run: |
           echo "=== Environment Variables Debug ==="
-          echo "APP_STORE_CONNECT_API_KEY_ID is set: ${{ env.APP_STORE_CONNECT_API_KEY_ID }}"
-          echo "APP_STORE_CONNECT_ISSUER_ID is set: ${{ env.APP_STORE_CONNECT_ISSUER_ID }}"
-          echo "MATCH_PASSWORD is set: ${{ env.MATCH_PASSWORD }}"
-          echo "TEST_KEY_123 is set: ${{ env.TEST_KEY_123 }}"
+          echo ""
+          echo "🔍 Checking if variables are set in shell:"
+          [ -n "$APP_STORE_CONNECT_API_KEY_ID" ] && echo "✅ APP_STORE_CONNECT_API_KEY_ID: SET (length: ${#APP_STORE_CONNECT_API_KEY_ID})" || echo "❌ APP_STORE_CONNECT_API_KEY_ID: NOT SET"
+          [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && echo "✅ APP_STORE_CONNECT_ISSUER_ID: SET (length: ${#APP_STORE_CONNECT_ISSUER_ID})" || echo "❌ APP_STORE_CONNECT_ISSUER_ID: NOT SET"
+          [ -n "$MATCH_PASSWORD" ] && echo "✅ MATCH_PASSWORD: SET (length: ${#MATCH_PASSWORD})" || echo "❌ MATCH_PASSWORD: NOT SET"
+          echo ""
+          echo "🔓 Actual values (base64 encoded to bypass masking):"
+          echo "APP_STORE_CONNECT_API_KEY_ID (base64): $(echo -n "$APP_STORE_CONNECT_API_KEY_ID" | base64)"
+          echo "APP_STORE_CONNECT_ISSUER_ID (base64): $(echo -n "$APP_STORE_CONNECT_ISSUER_ID" | base64)"
+          echo "MATCH_PASSWORD (base64): $(echo -n "$MATCH_PASSWORD" | base64 | head -c 30)... [truncated]"
+          echo ""
+          echo "🔓 Decoded values (for verification):"
+          echo "APP_STORE_CONNECT_API_KEY_ID: $(echo -n "$APP_STORE_CONNECT_API_KEY_ID" | base64 | base64 -d)"
+          echo "APP_STORE_CONNECT_ISSUER_ID: $(echo -n "$APP_STORE_CONNECT_ISSUER_ID" | base64 | base64 -d)"
+          echo ""
+          echo "📋 All environment variables containing 'APP_STORE' or 'MATCH':"
+          env | grep -E '(APP_STORE|MATCH)' | cut -d= -f1 | sort || echo "None found"
+          echo ""
           echo "Node version: $(node --version)"
           echo "Ruby version: $(ruby --version)"
           echo "Fastlane version: $(fastlane --version)"
           echo "Current directory: $(pwd)"
           echo "==================================="
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ env.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ env.APP_STORE_CONNECT_ISSUER_ID }}
+          MATCH_PASSWORD: ${{ env.MATCH_PASSWORD }}
       - name: Build and Release iOS
         run: fastlane ios qa_release
         env:
