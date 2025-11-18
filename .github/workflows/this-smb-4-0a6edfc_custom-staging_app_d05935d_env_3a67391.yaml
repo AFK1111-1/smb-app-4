@@ -538,13 +538,29 @@ jobs:
           # Check if FASTLANE_PASSWORD looks like base64 or raw PEM
           if echo "$FASTLANE_PASSWORD" | head -c 30 | grep -q "BEGIN PRIVATE KEY"; then
             echo "⚠️  FASTLANE_PASSWORD appears to be raw PEM, writing directly"
-            echo "$FASTLANE_PASSWORD" > credentials/ios/AuthKey.p8
+            echo "$FASTLANE_PASSWORD" > credentials/ios/AuthKey.p8.tmp
           else
             echo "📝 FASTLANE_PASSWORD appears to be base64, decoding..."
-            echo -n "$FASTLANE_PASSWORD" | base64 --decode > credentials/ios/AuthKey.p8
+            echo -n "$FASTLANE_PASSWORD" | base64 --decode > credentials/ios/AuthKey.p8.tmp
           fi
           
-          echo "✅ AuthKey.p8 created"
+          # Fix: Remove spaces from base64 content and format properly
+          echo "🔧 Formatting .p8 file properly..."
+          
+          # Extract just the base64 content (between headers)
+          base64_content=$(sed -n '/BEGIN PRIVATE KEY/,/END PRIVATE KEY/p' credentials/ios/AuthKey.p8.tmp | \
+            grep -v "BEGIN PRIVATE KEY" | \
+            grep -v "END PRIVATE KEY" | \
+            tr -d ' \n')
+          
+          # Write properly formatted .p8 file
+          echo "-----BEGIN PRIVATE KEY-----" > credentials/ios/AuthKey.p8
+          echo "$base64_content" | fold -w 64 >> credentials/ios/AuthKey.p8
+          echo "-----END PRIVATE KEY-----" >> credentials/ios/AuthKey.p8
+          
+          rm credentials/ios/AuthKey.p8.tmp
+          
+          echo "✅ AuthKey.p8 created and formatted"
         env:
           FASTLANE_PASSWORD: ${{ env.FASTLANE_PASSWORD }}
           
