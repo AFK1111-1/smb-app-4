@@ -518,6 +518,10 @@ jobs:
         run: |
           echo "Encoded secret length (characters):"
           echo "${{ secrets.FASTLANE_PASSWORD }}" | wc -c
+      - name: Decode API Key
+        run: |
+          mkdir -p credentials/ios
+          echo -n "${{ secrets.FASTLANE_PASSWORD }}" | base64 --decode > credentials/ios/AuthKey.p8
       - name: Setup Google Service Info Plist for iOS
         run: >
           echo "${{ env.IOS_GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode >
