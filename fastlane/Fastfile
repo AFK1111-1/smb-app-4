@@ -112,17 +112,17 @@ platform :ios do
 
   desc "Submit a new QA build to TestFlight"
   lane :qa_release do
-    # Debug: Log environment variables
-    UI.important "=== Environment Variables Debug ==="
-    UI.message "APP_STORE_CONNECT_API_KEY_ID: #{ENV['APP_STORE_CONNECT_API_KEY_ID'] ? '✅ SET' : '❌ NOT SET'}"
-    UI.message "APP_STORE_CONNECT_ISSUER_ID: #{ENV['APP_STORE_CONNECT_ISSUER_ID'] ? '✅ SET' : '❌ NOT SET'}"
-    UI.message "MATCH_PASSWORD: #{ENV['MATCH_PASSWORD'] ? '✅ SET' : '❌ NOT SET'}"
-    UI.message "Key file path: credentials/ios/AuthKey.p8"
-    UI.message "Key file exists: #{File.exist?('credentials/ios/AuthKey.p8') ? '✅ YES' : '❌ NO'}"
-    if File.exist?('credentials/ios/AuthKey.p8')
-      UI.message "Key file size: #{File.size('credentials/ios/AuthKey.p8')} bytes"
-    end
-    UI.important "==================================="
+    # # Debug: Log environment variables
+    # UI.important "=== Environment Variables Debug ==="
+    # UI.message "APP_STORE_CONNECT_API_KEY_ID: #{ENV['APP_STORE_CONNECT_API_KEY_ID'] ? '✅ SET' : '❌ NOT SET'}"
+    # UI.message "APP_STORE_CONNECT_ISSUER_ID: #{ENV['APP_STORE_CONNECT_ISSUER_ID'] ? '✅ SET' : '❌ NOT SET'}"
+    # UI.message "MATCH_PASSWORD: #{ENV['MATCH_PASSWORD'] ? '✅ SET' : '❌ NOT SET'}"
+    # UI.message "Key file path: credentials/ios/AuthKey.p8"
+    # UI.message "Key file exists: #{File.exist?('credentials/ios/AuthKey.p8') ? '✅ YES' : '❌ NO'}"
+    # if File.exist?('credentials/ios/AuthKey.p8')
+    #   UI.message "Key file size: #{File.size('credentials/ios/AuthKey.p8')} bytes"
+    # end
+    # UI.important "==================================="
 
     api_key = app_store_connect_api_key(
       key_id: ENV['APP_STORE_CONNECT_API_KEY_ID'],
