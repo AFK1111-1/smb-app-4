@@ -507,7 +507,7 @@ jobs:
 
       - name: Setup Apple API Key for Fastlane Match
         run: |
-          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | base64 --decode > credentials/ios/AuthKey.p8
+          echo "${{ secrets.FASTLANE_PASSWORD }}" | base64 --decode > credentials/ios/AuthKey.p8
           
       - name: Debug Apple Key File Size
         run: |
@@ -517,7 +517,7 @@ jobs:
       - name: Debug encoded secret
         run: |
           echo "Encoded secret length (characters):"
-          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | wc -c
+          echo "${{ secrets.FASTLANE_PASSWORD }}" | wc -c
       - name: Setup Google Service Info Plist for iOS
         run: >
           echo "${{ env.IOS_GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode >
