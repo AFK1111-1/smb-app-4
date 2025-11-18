@@ -535,12 +535,12 @@ jobs:
         run: |
           mkdir -p credentials/ios
           
-          # Check if FASTLANE_PASSWORD looks like base64 or raw PEM
-          if echo "$FASTLANE_PASSWORD" | head -c 30 | grep -q "BEGIN PRIVATE KEY"; then
-            echo "⚠️  FASTLANE_PASSWORD appears to be raw PEM, writing directly"
+          # Check if FASTLANE_PASSWORD looks like raw PEM (starts with -----)
+          if echo "$FASTLANE_PASSWORD" | head -c 5 | grep -q "^-----"; then
+            echo "✅ FASTLANE_PASSWORD is raw PEM format, writing directly"
             echo "$FASTLANE_PASSWORD" > credentials/ios/AuthKey.p8.tmp
           else
-            echo "📝 FASTLANE_PASSWORD appears to be base64, decoding..."
+            echo "📝 FASTLANE_PASSWORD is base64 encoded, decoding..."
             echo -n "$FASTLANE_PASSWORD" | base64 --decode > credentials/ios/AuthKey.p8.tmp
           fi
           
@@ -560,7 +560,7 @@ jobs:
           
           rm credentials/ios/AuthKey.p8.tmp
           
-          echo "✅ AuthKey.p8 created and formatted"
+          echo "✅ AuthKey.p8 created at: $(pwd)/credentials/ios/AuthKey.p8"
         env:
           FASTLANE_PASSWORD: ${{ env.FASTLANE_PASSWORD }}
           
