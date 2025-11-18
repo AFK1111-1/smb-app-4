@@ -159,14 +159,14 @@ platform :ios do
     )
     
     # Update Xcode project with team ID and provisioning profile
-    update_code_signing_settings(
-      use_automatic_signing: false,
-      path: "ios/smbmobile.xcodeproj",
-      team_id: "96W7U4JYV4",
-      profile_name: "match AppStore com.insighture.smbmobile",
-      code_sign_identity: "iPhone Distribution",
-      targets: ["smbmobile"]
-    )
+    # update_code_signing_settings(
+    #   use_automatic_signing: false,
+    #   path: "ios/smbmobile.xcodeproj",
+    #   team_id: "96W7U4JYV4",
+    #   profile_name: "match AppStore com.insighture.smbmobile",
+    #   code_sign_identity: "iPhone Distribution",
+    #   targets: ["smbmobile"]
+    # )
 
     # ✅ Fix for versioning
     increment_version_number(
