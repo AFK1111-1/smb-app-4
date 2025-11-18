@@ -728,6 +728,18 @@ jobs:
           APP_STORE_CONNECT_API_KEY_ID: ${{ env.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ env.APP_STORE_CONNECT_ISSUER_ID }}
           MATCH_PASSWORD: ${{ env.MATCH_PASSWORD }}
+      
+      - name: Show Full Build Log (if build failed)
+        if: failure()
+        run: |
+          echo "🔍 Full Xcode build log:"
+          if [ -f ~/Library/Logs/gym/smbmobile-smbmobile.log ]; then
+            cat ~/Library/Logs/gym/smbmobile-smbmobile.log
+          else
+            echo "❌ Log file not found"
+            echo "Searching for gym logs..."
+            find ~/Library/Logs/gym -name "*.log" -exec echo "Found: {}" \; -exec tail -100 {} \;
+          fi
       # - name: Upload Android Release AAB
       #   uses: actions/upload-artifact@v4
       #   with:
