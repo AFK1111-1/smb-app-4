@@ -505,10 +505,45 @@ jobs:
       #     # Use the raw PEM key directly from the secret, GitHub preserves newlines
       #     echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" > credentials/ios/AuthKey.p8
 
+      - name: Debug FASTLANE_PASSWORD Before Decode
+        run: |
+          echo "🔍 Checking FASTLANE_PASSWORD variable:"
+          echo "Length: ${#FASTLANE_PASSWORD} characters"
+          echo ""
+          echo "First 100 chars of FASTLANE_PASSWORD:"
+          echo "$FASTLANE_PASSWORD" | head -c 100
+          echo ""
+          echo ""
+          echo "Checking if it's already valid base64:"
+          if echo "$FASTLANE_PASSWORD" | base64 -d > /dev/null 2>&1; then
+            echo "✅ Valid base64 string"
+            echo ""
+            echo "Decoded first 50 chars:"
+            echo "$FASTLANE_PASSWORD" | base64 -d | head -c 50
+            echo ""
+          else
+            echo "❌ NOT valid base64 - might already be decoded!"
+            echo ""
+            echo "Treating as raw content, first 50 chars:"
+            echo "$FASTLANE_PASSWORD" | head -c 50
+            echo ""
+          fi
+        env:
+          FASTLANE_PASSWORD: ${{ env.FASTLANE_PASSWORD }}
+          
       - name: Setup Apple API Key for Fastlane Match
         run: |
           mkdir -p credentials/ios
-          echo -n "$FASTLANE_PASSWORD" | base64 --decode > credentials/ios/AuthKey.p8
+          
+          # Check if FASTLANE_PASSWORD looks like base64 or raw PEM
+          if echo "$FASTLANE_PASSWORD" | head -c 30 | grep -q "BEGIN PRIVATE KEY"; then
+            echo "⚠️  FASTLANE_PASSWORD appears to be raw PEM, writing directly"
+            echo "$FASTLANE_PASSWORD" > credentials/ios/AuthKey.p8
+          else
+            echo "📝 FASTLANE_PASSWORD appears to be base64, decoding..."
+            echo -n "$FASTLANE_PASSWORD" | base64 --decode > credentials/ios/AuthKey.p8
+          fi
+          
           echo "✅ AuthKey.p8 created"
         env:
           FASTLANE_PASSWORD: ${{ env.FASTLANE_PASSWORD }}
