@@ -411,6 +411,52 @@ Create a temporary keychain with a known password:
 
 ---
 
+## 10. TestFlight Upload - Duplicate Build Number
+
+### Problem
+```
+The bundle version must be higher than the previously uploaded version: '14'
+```
+
+### Root Cause
+`increment_build_number` increments from the Xcode project file, not from the latest build in TestFlight. If you've previously uploaded build 14, and the project file resets to 1, it tries to upload build 2.
+
+### Solution
+Fetch the latest build number from TestFlight first:
+
+```ruby
+begin
+  latest_build = latest_testflight_build_number(
+    app_identifier: "com.insighture.smbmobile",
+    api_key: api_key
+  )
+  
+  increment_build_number(
+    xcodeproj: "ios/smbmobile.xcodeproj",
+    build_number: latest_build + 1
+  )
+rescue => ex
+  # Fallback to local increment if fetch fails
+  increment_build_number(
+    xcodeproj: "ios/smbmobile.xcodeproj"
+  )
+end
+```
+
+### Alternative: Manual Reset
+
+If you want to reset build numbers locally:
+
+```bash
+# In App Store Connect, delete all TestFlight builds
+# Then in Xcode project, set build number to 1
+agvtool new-version -all 1
+```
+
+**Note**: This requires all previous builds to be removed from TestFlight first.
+
+---
+
 ## Quick Reference: Common Issues
 
 | Error Message | Fix |
@@ -422,6 +468,7 @@ Create a temporary keychain with a known password:
 | `Workspace file not found` | Run `pod install` after `expo prebuild` |
 | `Invalid password passed via MATCH_PASSWORD` | Create temporary keychain and pass password to Match |
 | `Couldn't automatically detect the project file` | Add workspace + scheme to `build_ios_app` |
+| `bundle version must be higher than previously uploaded` | Fetch latest build number from TestFlight first |
 
 ---
 
