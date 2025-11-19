@@ -179,18 +179,17 @@ platform :ios do
       xcodeproj: "ios/smbmobile.xcodeproj"
     )
 
-    # Build archive using xcodebuild with explicit architecture settings
-    # This bypasses destination validation by specifying architectures directly
+    # Build directly targeting the project/target (bypasses scheme destination validation)
     archive_path = "#{Dir.pwd}/../ios/build/smbmobile.xcarchive"
+    build_dir = "#{Dir.pwd}/../ios/build"
     
-    UI.message "🔨 Building iOS archive for arm64 (bypasses destination validation)..."
+    UI.message "🔨 Building iOS app for arm64 (direct target build, no scheme)..."
     
-    # Build with explicit architecture specification to bypass destination checks
-    # Use build action with DSTROOT instead of archive action
+    # Build the target directly without using scheme (avoids destination validation)
     sh("cd #{Dir.pwd}/.. && " \
        "xcodebuild build " \
-       "-workspace ./ios/smbmobile.xcworkspace " \
-       "-scheme smbmobile " \
+       "-project ./ios/smbmobile.xcodeproj " \
+       "-target smbmobile " \
        "-configuration Release " \
        "-sdk iphoneos " \
        "-arch arm64 " \
@@ -200,24 +199,30 @@ platform :ios do
        "ONLY_ACTIVE_ARCH=NO " \
        "ENABLE_BITCODE=NO " \
        "COMPILER_INDEX_STORE_ENABLE=NO " \
-       "DSTROOT='#{Dir.pwd}/../ios/build/dst' " \
-       "OBJROOT='#{Dir.pwd}/../ios/build/obj' " \
-       "SYMROOT='#{Dir.pwd}/../ios/build/sym' " \
-       "DEPLOYMENT_LOCATION=YES " \
+       "BUILD_DIR='#{build_dir}' " \
+       "CONFIGURATION_BUILD_DIR='#{build_dir}/Release-iphoneos' " \
        "-allowProvisioningUpdates")
     
+    UI.success "✅ Build completed successfully"
     UI.message "📦 Creating archive structure from build output..."
     
     # Create archive structure manually
     sh("mkdir -p '#{archive_path}/Products/Applications'")
-    sh("cp -R '#{Dir.pwd}/../ios/build/dst/Applications/smbmobile.app' '#{archive_path}/Products/Applications/'")
+    sh("cp -R '#{build_dir}/Release-iphoneos/smbmobile.app' '#{archive_path}/Products/Applications/'")
+    
+    # Create dSYMs directory if dSYM exists
+    if File.exist?("#{build_dir}/Release-iphoneos/smbmobile.app.dSYM")
+      sh("mkdir -p '#{archive_path}/dSYMs'")
+      sh("cp -R '#{build_dir}/Release-iphoneos/smbmobile.app.dSYM' '#{archive_path}/dSYMs/'")
+    end
     
     # Create Info.plist for archive
     info_plist = {
       "ApplicationProperties" => {
         "ApplicationPath" => "Applications/smbmobile.app",
         "CFBundleIdentifier" => "com.insighture.smbmobile",
-        "SigningIdentity" => "iPhone Distribution: Insighture PTY LTD (96W7U4JYV4)"
+        "SigningIdentity" => "iPhone Distribution: Insighture PTY LTD (96W7U4JYV4)",
+        "TeamID" => "96W7U4JYV4"
       },
       "ArchiveVersion" => 2,
       "Name" => "smbmobile",
