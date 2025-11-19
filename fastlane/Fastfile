@@ -196,11 +196,16 @@ platform :ios do
        "CODE_SIGN_IDENTITY='iPhone Distribution' " \
        "PROVISIONING_PROFILE_SPECIFIER='match AppStore com.insighture.smbmobile' " \
        "DEVELOPMENT_TEAM='96W7U4JYV4' " \
+       "TARGETED_DEVICE_FAMILY='1,2' " \
        "ONLY_ACTIVE_ARCH=NO " \
        "ENABLE_BITCODE=NO " \
        "COMPILER_INDEX_STORE_ENABLE=NO " \
+       "ASSETCATALOG_COMPILER_SKIP_APP_STORE_DEPLOYMENT=NO " \
+       "ASSETCATALOG_COMPILER_APPICON_NAME=AppIcon " \
+       "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME=AccentColor " \
        "BUILD_DIR='#{build_dir}' " \
        "CONFIGURATION_BUILD_DIR='#{build_dir}/Release-iphoneos' " \
+       "SKIP_INSTALL=NO " \
        "-allowProvisioningUpdates")
     
     UI.success "✅ Build completed successfully"

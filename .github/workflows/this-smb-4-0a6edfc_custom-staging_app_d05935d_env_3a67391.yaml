@@ -656,6 +656,18 @@ jobs:
           echo ""
           echo "✅ Accepting Xcode licenses..."
           sudo xcodebuild -license accept || echo "License already accepted"
+          
+          echo ""
+          echo "📥 Installing iOS 18.0 simulator runtime..."
+          # Try to download and install iOS simulator runtime
+          sudo xcrun simctl runtime add "iOS 18.0" 2>/dev/null || echo "⚠️ Could not install iOS 18.0 runtime via simctl"
+          
+          # Alternative: Try xcodebuild method
+          sudo xcodebuild -downloadPlatform iOS 2>/dev/null || echo "⚠️ Platform download not available"
+          
+          echo ""
+          echo "📋 Available simulator runtimes:"
+          xcrun simctl list runtimes | grep iOS || echo "No iOS runtimes found"
       
       - name: Verify Xcode Setup
         run: |
