@@ -183,97 +183,45 @@ platform :ios do
     archive_path = "#{Dir.pwd}/../ios/build/smbmobile.xcarchive"
     build_dir = "#{Dir.pwd}/../ios/build"
     
-    UI.message "🔨 Building iOS app for arm64 (direct target build, no scheme)..."
-    
-    UI.important "⚠️  This build may encounter asset catalog issues on GitHub Actions with Xcode 16"
-    UI.message "The iOS simulator runtime is not properly configured, which may cause asset compilation warnings."
-    UI.message "However, if the main app binary builds successfully, we'll proceed with packaging."
+    UI.message "🔨 Building iOS app using workspace (required for CocoaPods)..."
+    UI.message "Using Xcode 16.1 with generic iOS device destination"
     UI.message ""
     
-    # Try to build - may fail on asset catalog but succeed on actual compilation
+    # Build using workspace - REQUIRED for CocoaPods to include all Expo module dependencies
+    # Using generic/platform=iOS destination to avoid simulator runtime requirement
     begin
       sh("cd #{Dir.pwd}/.. && " \
-         "xcodebuild build " \
-         "-project ./ios/smbmobile.xcodeproj " \
-         "-target smbmobile " \
+         "xcodebuild archive " \
+         "-workspace ./ios/smbmobile.xcworkspace " \
+         "-scheme smbmobile " \
          "-configuration Release " \
-         "-sdk iphoneos " \
-         "-arch arm64 " \
+         "-destination 'generic/platform=iOS' " \
+         "-archivePath '#{archive_path}' " \
          "CODE_SIGN_IDENTITY='iPhone Distribution' " \
          "PROVISIONING_PROFILE_SPECIFIER='match AppStore com.insighture.smbmobile' " \
          "DEVELOPMENT_TEAM='96W7U4JYV4' " \
-         "TARGETED_DEVICE_FAMILY='1,2' " \
          "ONLY_ACTIVE_ARCH=NO " \
          "ENABLE_BITCODE=NO " \
          "COMPILER_INDEX_STORE_ENABLE=NO " \
-         "BUILD_DIR='#{build_dir}' " \
-         "CONFIGURATION_BUILD_DIR='#{build_dir}/Release-iphoneos' " \
          "-allowProvisioningUpdates")
       
-      UI.success "✅ Build completed successfully!"
+      UI.success "✅ Archive created successfully!"
     rescue => ex
-      # Build failed - check if app binary was still produced
-      UI.important "⚠️  Build command failed with error:"
+      UI.error "❌ Build failed:"
       UI.error ex.message
-      UI.important ""
-      UI.important "Checking if app binary was still produced despite the error..."
-      UI.important "Looking for: #{build_dir}/Release-iphoneos/smbmobile.app/smbmobile"
-      
-      # List what we have in the build directory
-      if Dir.exist?("#{build_dir}/Release-iphoneos")
-        UI.message "Contents of Release-iphoneos directory:"
-        Dir.entries("#{build_dir}/Release-iphoneos").each { |entry| UI.message "  - #{entry}" }
-      else
-        UI.error "Release-iphoneos directory doesn't exist"
-      end
-      
-      if File.exist?("#{build_dir}/Release-iphoneos/smbmobile.app/smbmobile")
-        UI.success "✅ App binary exists despite build errors - proceeding!"
-      else
-        UI.error "❌ Build failed and no app binary was produced"
-        UI.error "This is likely due to the asset catalog compilation requiring iOS simulator runtime"
-        UI.error "which is not available on GitHub Actions with Xcode 16."
-        UI.error ""
-        UI.error "Recommended solutions:"
-        UI.error "1. Use Expo EAS Build (cloud build service)"
-        UI.error "2. Use a different CI provider (Bitrise, CircleCI)"  
-        UI.error "3. Use a self-hosted macOS runner with properly configured Xcode"
-        raise ex
-      end
+      UI.error ""
+      UI.error "Build failed with Xcode 16.1 using workspace."
+      UI.error "This could be due to:"
+      UI.error "1. Missing iOS dependencies in pod install"
+      UI.error "2. Xcode 16.1 configuration issues on GitHub Actions"
+      UI.error "3. Code signing or provisioning profile problems"
+      raise ex
     end
-    
-    UI.success "✅ Build completed successfully"
-    UI.message "📦 Creating archive structure from build output..."
-    
-    # Create archive structure manually
-    sh("mkdir -p '#{archive_path}/Products/Applications'")
-    sh("cp -R '#{build_dir}/Release-iphoneos/smbmobile.app' '#{archive_path}/Products/Applications/'")
-    
-    # Create dSYMs directory if dSYM exists
-    if File.exist?("#{build_dir}/Release-iphoneos/smbmobile.app.dSYM")
-      sh("mkdir -p '#{archive_path}/dSYMs'")
-      sh("cp -R '#{build_dir}/Release-iphoneos/smbmobile.app.dSYM' '#{archive_path}/dSYMs/'")
-    end
-    
-    # Create Info.plist for archive
-    info_plist = {
-      "ApplicationProperties" => {
-        "ApplicationPath" => "Applications/smbmobile.app",
-        "CFBundleIdentifier" => "com.insighture.smbmobile",
-        "SigningIdentity" => "iPhone Distribution: Insighture PTY LTD (96W7U4JYV4)",
-        "TeamID" => "96W7U4JYV4"
-      },
-      "ArchiveVersion" => 2,
-      "Name" => "smbmobile",
-      "SchemeName" => "smbmobile"
-    }
-    
-    require 'plist'
-    File.write("#{archive_path}/Info.plist", Plist::Emit.dump(info_plist))
     
     UI.success "✅ Archive created at: #{archive_path}"
+    UI.message "📦 Exporting IPA for App Store distribution..."
     
-    # Use gym only for exporting the IPA (skip the build phase)
+    # Export the archive to IPA
     build_ios_app(
       skip_build_archive: true,
       archive_path: archive_path,
