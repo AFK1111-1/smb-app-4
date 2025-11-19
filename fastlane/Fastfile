@@ -213,12 +213,31 @@ platform :ios do
       UI.success "✅ Build completed successfully!"
     rescue => ex
       # Build failed - check if app binary was still produced
-      UI.important "Build command failed, but checking if app binary was produced..."
+      UI.important "⚠️  Build command failed with error:"
+      UI.error ex.message
+      UI.important ""
+      UI.important "Checking if app binary was still produced despite the error..."
+      UI.important "Looking for: #{build_dir}/Release-iphoneos/smbmobile.app/smbmobile"
+      
+      # List what we have in the build directory
+      if Dir.exist?("#{build_dir}/Release-iphoneos")
+        UI.message "Contents of Release-iphoneos directory:"
+        Dir.entries("#{build_dir}/Release-iphoneos").each { |entry| UI.message "  - #{entry}" }
+      else
+        UI.error "Release-iphoneos directory doesn't exist"
+      end
       
       if File.exist?("#{build_dir}/Release-iphoneos/smbmobile.app/smbmobile")
         UI.success "✅ App binary exists despite build errors - proceeding!"
       else
         UI.error "❌ Build failed and no app binary was produced"
+        UI.error "This is likely due to the asset catalog compilation requiring iOS simulator runtime"
+        UI.error "which is not available on GitHub Actions with Xcode 16."
+        UI.error ""
+        UI.error "Recommended solutions:"
+        UI.error "1. Use Expo EAS Build (cloud build service)"
+        UI.error "2. Use a different CI provider (Bitrise, CircleCI)"  
+        UI.error "3. Use a self-hosted macOS runner with properly configured Xcode"
         raise ex
       end
     end
