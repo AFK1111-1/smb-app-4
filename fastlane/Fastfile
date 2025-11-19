@@ -182,17 +182,14 @@ platform :ios do
       scheme: "smbmobile",
       clean: true,
       output_directory: "./ios/build",
-      derived_data_path: "./ios/build/DerivedData",
       export_method: "app-store",
-      sdk: "iphoneos",
       export_options: {
         method: "app-store",
         provisioningProfiles: {
           "com.insighture.smbmobile" => "match AppStore com.insighture.smbmobile"
         }
       },
-      output_name: "smbmobile.ipa",
-      verbose: true,
+      output_name: "smbmobile.ipa"
     )
 
     upload_to_testflight(
@@ -216,7 +213,6 @@ platform :ios do
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
       export_method: "app-store",
-      sdk: "iphoneos",
       export_options: {
         method: "app-store",
         provisioningProfiles: {
@@ -249,7 +245,6 @@ platform :ios do
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
       export_method: "app-store",
-      sdk: "iphoneos",
       export_options: {
         method: "app-store",
         provisioningProfiles: {
@@ -284,7 +279,6 @@ platform :ios do
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
       export_method: "app-store",
-      sdk: "iphoneos",
       export_options: {
         method: "app-store",
         provisioningProfiles: {

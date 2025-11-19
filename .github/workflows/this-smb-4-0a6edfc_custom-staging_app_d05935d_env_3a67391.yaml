@@ -643,28 +643,13 @@ jobs:
           echo "SSH key file size: $(stat -f%z ~/.ssh/id_rsa) bytes"
         env:
           FASTLANE_MATCH_DEPLOY_KEY: ${{ env.FASTLANE_MATCH_DEPLOY_KEY }}
-      - name: Select Xcode and verify SDK
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4'
+      
+      - name: Verify Xcode Setup
         run: |
-          echo "Available Xcode versions:"
-          ls -la /Applications/ | grep Xcode
-          echo ""
-          
-          # Try Xcode 16.1 first (more stable on GitHub Actions)
-          if [ -d "/Applications/Xcode_16.1.app" ]; then
-            echo "✅ Using Xcode 16.1"
-            sudo xcode-select -s /Applications/Xcode_16.1.app
-          elif [ -d "/Applications/Xcode_16.0.app" ]; then
-            echo "✅ Using Xcode 16.0"
-            sudo xcode-select -s /Applications/Xcode_16.0.app
-          elif [ -d "/Applications/Xcode_16.2.app" ]; then
-            echo "⚠️  Using Xcode 16.2 (may have SDK issues)"
-            sudo xcode-select -s /Applications/Xcode_16.2.app
-          else
-            echo "✅ Using default Xcode"
-            sudo xcode-select -s /Applications/Xcode.app
-          fi
-          
-          echo ""
           echo "Selected Xcode path:"
           xcode-select -p
           echo ""
@@ -674,8 +659,8 @@ jobs:
           echo "Available iOS SDKs:"
           xcodebuild -showsdks | grep iOS
           echo ""
-          echo "Available destinations for generic iOS:"
-          xcodebuild -workspace ./ios/smbmobile.xcworkspace -scheme smbmobile -showdestinations 2>&1 | grep -A 20 "Available destinations" || echo "Could not list destinations"
+          echo "Checking workspace destinations:"
+          xcodebuild -workspace ./ios/smbmobile.xcworkspace -scheme smbmobile -showdestinations 2>&1 | head -30 || echo "Could not list destinations"
       # - name: Select Xcode version
       #   uses: maxim-lobanov/setup-xcode@v1
       #   with:
