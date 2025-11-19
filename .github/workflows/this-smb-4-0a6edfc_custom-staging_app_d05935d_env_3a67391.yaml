@@ -749,52 +749,46 @@ jobs:
           TEST_KEY_123: ${{ env.TEST_KEY_123 }}
 
       - name: Create temporary keychain for code signing
+          run: |
+        # Create a temporary keychain with a password
+        KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+        KEYCHAIN_NAME="build.keychain"
+        echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> $GITHUB_ENV
+        echo "KEYCHAIN_NAME=$KEYCHAIN_NAME" >> $GITHUB_ENV
+        # Remove keychain if it already exists
+        security delete-keychain "$KEYCHAIN_NAME" 2>/dev/null || true
+        # Create the keychain
+        security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+        # Get existing keychains and add our new one to the list
+        EXISTING_KEYCHAINS=$(security list-keychains -d user | tr -d '"' | tr '\n' ' ')
+        security list-keychains -d user -s "$KEYCHAIN_NAME" $EXISTING_KEYCHAINS
+        # Set as default keychain
+        security default-keychain -s "$KEYCHAIN_NAME"
+        # Unlock the keychain
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+        # Set keychain settings to not lock on sleep and timeout
+        security set-keychain-settings -t 3600 -u "$KEYCHAIN_NAME"
+        # Allow codesign to access the keychain without UI popup
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+        # Verify keychain is accessible
+        echo "Keychains in search list:"
+        security list-keychains
+        echo "Default keychain:"
+        security default-keychain
+      - name: Unlock keychain before build
         run: |
-          echo "🔐 Creating temporary keychain for CI..."
-          
-          # Generate a random password for the keychain
-          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
-          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> $GITHUB_ENV
-          
-          # Set keychain path
-          KEYCHAIN_PATH="$HOME/Library/Keychains/build.keychain-db"
-          
-          # Delete keychain if it already exists
-          security delete-keychain build.keychain-db 2>/dev/null || true
-          
-          # Create a new keychain
-          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain-db
-          
-          # Add keychain to search list
-          security list-keychains -d user -s build.keychain-db login.keychain-db
-          
-          # Set as default keychain
-          security default-keychain -s build.keychain-db
-          
-          # Unlock the keychain
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain-db
-          
-          # Set keychain timeout to 1 hour and disable auto-lock
-          security set-keychain-settings -t 3600 -u build.keychain-db
-          
-          echo "✅ Keychain created and configured successfully"
-          echo "Keychain path: $KEYCHAIN_PATH"
-      
-      - name: Build and Release iOS
+          security unlock-keychain -p "${{ env.KEYCHAIN_PASSWORD }}" "${{ env.KEYCHAIN_NAME }}"
+          security list-keychains
+          security default-keychain
+
+      - name: Build and Release iOS iOS
         run: fastlane ios qa_release
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ env.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ env.APP_STORE_CONNECT_ISSUER_ID }}
           MATCH_PASSWORD: ${{ env.MATCH_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ env.KEYCHAIN_PASSWORD }}
-      
-      - name: Cleanup temporary keychain
-        if: always()
-        run: |
-          echo "🧹 Cleaning up temporary keychain..."
-          security delete-keychain build.keychain-db 2>/dev/null || echo "Keychain already deleted or doesn't exist"
-          echo "✅ Cleanup complete"
-      
+          KEYCHAIN_NAME: ${{ env.KEYCHAIN_NAME }}
       - name: Show Full Build Log (if build failed)
         if: failure()
         run: |

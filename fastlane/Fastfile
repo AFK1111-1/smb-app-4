@@ -156,8 +156,8 @@ platform :ios do
       git_url: "git@github.com:insighture/smb-mobile-fastlane.git",
       api_key: api_key,
       force_for_new_devices: true,
-      keychain_name: "build.keychain-db",
-      keychain_password: ENV['KEYCHAIN_PASSWORD']
+      keychain_password: ENV['KEYCHAIN_PASSWORD'],
+      keychain_name: ENV['KEYCHAIN_NAME']
     )
     
     # Update Xcode project with team ID and provisioning profile
