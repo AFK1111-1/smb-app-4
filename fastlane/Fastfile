@@ -223,6 +223,8 @@ platform :ios do
     build_ios_app(
       skip_build_archive: true,
       archive_path: archive_path,
+      workspace: "ios/smbmobile.xcworkspace",
+      scheme: "smbmobile",
       export_method: "app-store",
       output_directory: "./ios/build",
       export_options: {
