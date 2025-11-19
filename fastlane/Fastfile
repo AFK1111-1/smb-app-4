@@ -179,17 +179,39 @@ platform :ios do
       xcodeproj: "ios/smbmobile.xcodeproj"
     )
 
+    # Build archive using xcodebuild directly (bypasses iOS platform requirement)
+    archive_path = "#{Dir.pwd}/../ios/build/smbmobile.xcarchive"
+    
+    UI.message "🔨 Building iOS archive with SDK iphoneos (no platform required)..."
+    
+    # Use xcodebuild directly with -sdk flag instead of -destination
+    # This only requires the SDK (which is available) not the full iOS platform
+    sh("cd #{Dir.pwd}/.. && " \
+       "xcodebuild clean archive " \
+       "-workspace ./ios/smbmobile.xcworkspace " \
+       "-scheme smbmobile " \
+       "-configuration Release " \
+       "-sdk iphoneos " \
+       "-archivePath '#{archive_path}' " \
+       "CODE_SIGN_IDENTITY='iPhone Distribution' " \
+       "PROVISIONING_PROFILE_SPECIFIER='match AppStore com.insighture.smbmobile' " \
+       "DEVELOPMENT_TEAM='96W7U4JYV4' " \
+       "-allowProvisioningUpdates")
+    
+    UI.success "✅ Archive created at: #{archive_path}"
+    
+    # Use gym only for exporting the IPA (skip the build phase)
     build_ios_app(
-      workspace: "./ios/smbmobile.xcworkspace",
-      scheme: "smbmobile",
-      clean: true,
-      output_directory: "./ios/build",
+      skip_build_archive: true,
+      archive_path: archive_path,
       export_method: "app-store",
+      output_directory: "./ios/build",
       export_options: {
         method: "app-store",
         provisioningProfiles: {
           "com.insighture.smbmobile" => "match AppStore com.insighture.smbmobile"
-        }
+        },
+        teamID: "96W7U4JYV4"
       },
       output_name: "smbmobile.ipa"
     )
