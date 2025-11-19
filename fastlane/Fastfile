@@ -179,26 +179,53 @@ platform :ios do
       xcodeproj: "ios/smbmobile.xcodeproj"
     )
 
-    # Build archive using xcodebuild directly (bypasses iOS platform requirement)
+    # Build archive using xcodebuild with explicit architecture settings
+    # This bypasses destination validation by specifying architectures directly
     archive_path = "#{Dir.pwd}/../ios/build/smbmobile.xcarchive"
     
-    UI.message "🔨 Building iOS archive with SDK iphoneos (no platform required)..."
+    UI.message "🔨 Building iOS archive for arm64 (bypasses destination validation)..."
     
-    # Use xcodebuild directly with -sdk flag instead of -destination
-    # This only requires the SDK (which is available) not the full iOS platform
-    # Note: Skipping 'clean' because it also requires destination validation
+    # Build with explicit architecture specification to bypass destination checks
+    # Use build action with DSTROOT instead of archive action
     sh("cd #{Dir.pwd}/.. && " \
-       "xcodebuild archive " \
+       "xcodebuild build " \
        "-workspace ./ios/smbmobile.xcworkspace " \
        "-scheme smbmobile " \
        "-configuration Release " \
        "-sdk iphoneos " \
-       "-archivePath '#{archive_path}' " \
+       "-arch arm64 " \
        "CODE_SIGN_IDENTITY='iPhone Distribution' " \
        "PROVISIONING_PROFILE_SPECIFIER='match AppStore com.insighture.smbmobile' " \
        "DEVELOPMENT_TEAM='96W7U4JYV4' " \
        "ONLY_ACTIVE_ARCH=NO " \
+       "ENABLE_BITCODE=NO " \
+       "COMPILER_INDEX_STORE_ENABLE=NO " \
+       "DSTROOT='#{Dir.pwd}/../ios/build/dst' " \
+       "OBJROOT='#{Dir.pwd}/../ios/build/obj' " \
+       "SYMROOT='#{Dir.pwd}/../ios/build/sym' " \
+       "DEPLOYMENT_LOCATION=YES " \
        "-allowProvisioningUpdates")
+    
+    UI.message "📦 Creating archive structure from build output..."
+    
+    # Create archive structure manually
+    sh("mkdir -p '#{archive_path}/Products/Applications'")
+    sh("cp -R '#{Dir.pwd}/../ios/build/dst/Applications/smbmobile.app' '#{archive_path}/Products/Applications/'")
+    
+    # Create Info.plist for archive
+    info_plist = {
+      "ApplicationProperties" => {
+        "ApplicationPath" => "Applications/smbmobile.app",
+        "CFBundleIdentifier" => "com.insighture.smbmobile",
+        "SigningIdentity" => "iPhone Distribution: Insighture PTY LTD (96W7U4JYV4)"
+      },
+      "ArchiveVersion" => 2,
+      "Name" => "smbmobile",
+      "SchemeName" => "smbmobile"
+    }
+    
+    require 'plist'
+    File.write("#{archive_path}/Info.plist", Plist::Emit.dump(info_plist))
     
     UI.success "✅ Archive created at: #{archive_path}"
     
