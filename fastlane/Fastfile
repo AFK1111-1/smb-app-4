@@ -186,8 +186,9 @@ platform :ios do
     
     # Use xcodebuild directly with -sdk flag instead of -destination
     # This only requires the SDK (which is available) not the full iOS platform
+    # Note: Skipping 'clean' because it also requires destination validation
     sh("cd #{Dir.pwd}/.. && " \
-       "xcodebuild clean archive " \
+       "xcodebuild archive " \
        "-workspace ./ios/smbmobile.xcworkspace " \
        "-scheme smbmobile " \
        "-configuration Release " \
@@ -196,6 +197,7 @@ platform :ios do
        "CODE_SIGN_IDENTITY='iPhone Distribution' " \
        "PROVISIONING_PROFILE_SPECIFIER='match AppStore com.insighture.smbmobile' " \
        "DEVELOPMENT_TEAM='96W7U4JYV4' " \
+       "ONLY_ACTIVE_ARCH=NO " \
        "-allowProvisioningUpdates")
     
     UI.success "✅ Archive created at: #{archive_path}"
