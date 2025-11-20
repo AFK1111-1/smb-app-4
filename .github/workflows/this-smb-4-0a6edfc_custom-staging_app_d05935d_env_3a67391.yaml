@@ -647,45 +647,44 @@ jobs:
           echo "SSH key file size: $(stat -f%z ~/.ssh/id_rsa) bytes"
         env:
           FASTLANE_MATCH_DEPLOY_KEY: ${{ env.FASTLANE_MATCH_DEPLOY_KEY }}
-      - name: Setup Xcode 16.1
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: '16.1'
-      
-      - name: Setup Xcode First Launch
+      - name: Setup Xcode (Latest Stable)
         run: |
-          echo "🔧 Running Xcode first launch setup..."
-          sudo xcodebuild -runFirstLaunch
+          echo "Available Xcode versions:"
+          ls -la /Applications/ | grep Xcode
+          
+          # Try Xcode 16.2, 16.1, 16.0 in order of preference
+          if [ -d "/Applications/Xcode_16.2.app" ]; then
+            echo "✅ Using Xcode 16.2"
+            sudo xcode-select -s /Applications/Xcode_16.2.app
+          elif [ -d "/Applications/Xcode_16.1.app" ]; then
+            echo "✅ Using Xcode 16.1"
+            sudo xcode-select -s /Applications/Xcode_16.1.app
+          elif [ -d "/Applications/Xcode_16.0.app" ]; then
+            echo "✅ Using Xcode 16.0"
+            sudo xcode-select -s /Applications/Xcode_16.0.app
+          else
+            echo "⚠️ Using default Xcode"
+          fi
           
           echo ""
-          echo "✅ Accepting Xcode licenses..."
-          sudo xcodebuild -license accept || echo "License already accepted"
-          
-          echo ""
-          echo "📥 Installing iOS 18.0 simulator runtime..."
-          # Try to download and install iOS simulator runtime
-          sudo xcrun simctl runtime add "iOS 18.0" 2>/dev/null || echo "⚠️ Could not install iOS 18.0 runtime via simctl"
-          
-          # Alternative: Try xcodebuild method
-          sudo xcodebuild -downloadPlatform iOS 2>/dev/null || echo "⚠️ Platform download not available"
-          
-          echo ""
-          echo "📋 Available simulator runtimes:"
-          xcrun simctl list runtimes | grep iOS || echo "No iOS runtimes found"
-      
-      - name: Verify Xcode Setup
-        run: |
           echo "Selected Xcode path:"
           xcode-select -p
           echo ""
           echo "Xcode version:"
           xcodebuild -version
           echo ""
-          echo "Available iOS SDKs:"
-          xcodebuild -showsdks
-          echo ""
-          echo "Available iOS runtimes:"
-          xcrun simctl list runtimes | grep iOS || echo "No iOS runtimes found"
+          echo "iOS SDK:"
+          xcrun --sdk iphoneos --show-sdk-version
+      
+      - name: Verify iOS project structure
+        run: |
+          echo "iOS project structure:"
+          ls -la ios/
+          echo "Workspace contents:"
+          ls -la ios/smbmobile.xcworkspace/
+          echo "Xcode project contents:"
+          ls -la ios/smbmobile.xcodeproj/
+      
       - name: Debug - Log Environment Variables
         run: |
           echo "=== Environment Variables Debug ==="

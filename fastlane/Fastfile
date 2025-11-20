@@ -202,12 +202,15 @@ platform :ios do
     archive_path = "#{Dir.pwd}/../ios/build/smbmobile.xcarchive"
     build_dir = "#{Dir.pwd}/../ios/build"
     
+    # Get actual Xcode version being used
+    xcode_version = sh("xcodebuild -version | head -n 1").strip
+    
     UI.message "🔨 Building iOS app using workspace (required for CocoaPods)..."
-    UI.message "Using Xcode 16.1 with generic iOS device destination"
+    UI.message "Using #{xcode_version} with iphoneos SDK"
     UI.message ""
     
     # Build using workspace - REQUIRED for CocoaPods to include all Expo module dependencies
-    # Using generic/platform=iOS destination to avoid simulator runtime requirement
+    # Using -sdk iphoneos instead of -destination to avoid iOS runtime requirement
     # Code signing is configured per-target via update_code_signing_settings above
     begin
       sh("cd #{Dir.pwd}/.. && " \
@@ -215,7 +218,7 @@ platform :ios do
          "-workspace ./ios/smbmobile.xcworkspace " \
          "-scheme smbmobile " \
          "-configuration Release " \
-         "-destination 'generic/platform=iOS' " \
+         "-sdk iphoneos " \
          "-archivePath '#{archive_path}' " \
          "ONLY_ACTIVE_ARCH=NO " \
          "ENABLE_BITCODE=NO " \
@@ -227,10 +230,10 @@ platform :ios do
       UI.error "❌ Build failed:"
       UI.error ex.message
       UI.error ""
-      UI.error "Build failed with Xcode 16.1 using workspace."
+      UI.error "Build failed using workspace."
       UI.error "This could be due to:"
       UI.error "1. Missing iOS dependencies in pod install"
-      UI.error "2. Xcode 16.1 configuration issues on GitHub Actions"
+      UI.error "2. Xcode/iOS SDK configuration issues on GitHub Actions"
       UI.error "3. Code signing or provisioning profile problems"
       raise ex
     end
