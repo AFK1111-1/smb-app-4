@@ -16,28 +16,19 @@ platform :android do
 
   desc "Submit a new internal test build to play store"
   lane :qa_release do
-    # Get the highest version code from Google Play Console (across all tracks)
     begin
       latest_version_code = google_play_track_version_codes(
         track: "internal",
         json_key: "credentials/android/google-play-service-key.json"
       )[0]
       
-      UI.message "📊 Latest version code on internal track: #{latest_version_code}"
-      
-      # Set to latest + 1, ensuring we always increment
       new_version_code = latest_version_code + 1
       
     rescue => ex
       UI.important "⚠️ Could not fetch latest version code from Play Store: #{ex.message}"
-      UI.message "Reading current version code from build.gradle instead"
-      
-      # Fallback: read current version from gradle and increment
-      current_version = get_version_code(gradle_file_path: "android/app/build.gradle")
+      current_version = get_gradle_version_code(gradle_file_path: "android/app/build.gradle")
       new_version_code = current_version.to_i + 1
     end
-
-    UI.success "✅ New version code will be: #{new_version_code}"
 
     increment_version_name(
       gradle_file_path: "android/app/build.gradle"
@@ -47,16 +38,12 @@ platform :android do
       version_code: new_version_code
     )
 
-    UI.message "📦 Building AAB with version code: #{new_version_code}"
-
     gradle(task: "clean bundleRelease", project_dir: "./android", properties: {
       "android.injected.signing.store.file" => "#{Dir.pwd}/../credentials/android/release.keystore",
       "android.injected.signing.store.password" => ENV['ANDROID_KEYSTORE_PASSWORD'],
       "android.injected.signing.key.alias" => ENV['ANDROID_KEY_ALIAS'],
       "android.injected.signing.key.password" => ENV['ANDROID_KEY_PASSWORD']
     })
-
-    UI.success "✅ AAB built successfully with version code: #{new_version_code}"
 
     upload_to_play_store(
       track: 'internal',
@@ -66,8 +53,6 @@ platform :android do
       skip_upload_images: true,
       skip_upload_screenshots: true
     )
-
-    UI.success "✅ Successfully uploaded version #{new_version_code} to Play Store (internal track)"
     
     changelog_from_git_commits
   end
@@ -139,37 +124,6 @@ platform :ios do
 
   desc "Submit a new QA build to TestFlight"
   lane :qa_release do
-    # Debug: Log environment variables and file
-    UI.important "=== Fastlane Environment Debug ==="
-    UI.message "APP_STORE_CONNECT_API_KEY_ID: #{ENV['APP_STORE_CONNECT_API_KEY_ID'] ? '✅ SET' : '❌ NOT SET'}"
-    UI.message "APP_STORE_CONNECT_ISSUER_ID: #{ENV['APP_STORE_CONNECT_ISSUER_ID'] ? '✅ SET' : '❌ NOT SET'}"
-    UI.message "MATCH_PASSWORD: #{ENV['MATCH_PASSWORD'] ? '✅ SET' : '❌ NOT SET'}"
-    if ENV['MATCH_PASSWORD']
-      UI.message "MATCH_PASSWORD length: #{ENV['MATCH_PASSWORD'].length} characters"
-      UI.message "MATCH_PASSWORD value: '#{ENV['MATCH_PASSWORD']}'"
-    end
-    
-    key_path = "credentials/ios/AuthKey.p8"
-    UI.message "Key file path: #{key_path}"
-    
-    if File.exist?(key_path)
-      file_size = File.size(key_path)
-      UI.message "Key file exists: ✅ YES (#{file_size} bytes)"
-      
-      # Check for null bytes
-      content = File.read(key_path)
-      if content.include?("\x00")
-        UI.error "❌ ERROR: File contains null bytes!"
-        UI.error "First 100 chars: #{content[0..100].inspect}"
-      else
-        UI.success "✅ No null bytes detected"
-        UI.message "File starts with: #{content[0..50]}"
-      end
-    else
-      UI.error "Key file exists: ❌ NO"
-    end
-    UI.important "==================================="
-
     api_key = app_store_connect_api_key(
       key_id: ENV['APP_STORE_CONNECT_API_KEY_ID'],
       issuer_id: ENV['APP_STORE_CONNECT_ISSUER_ID'],
@@ -209,61 +163,31 @@ platform :ios do
         app_identifier: "com.insighture.smbmobile",
         api_key: api_key
       )
-      UI.message "📊 Latest TestFlight build number: #{latest_build}"
       
-      # Set build number to latest + 1
       increment_build_number(
         xcodeproj: "ios/smbmobile.xcodeproj",
         build_number: latest_build + 1
       )
-      UI.success "✅ Build number set to: #{latest_build + 1}"
     rescue => ex
-      UI.important "⚠️  Could not fetch latest TestFlight build number: #{ex.message}"
-      UI.message "Using increment from Xcode project instead"
+      UI.important "⚠️ Could not fetch latest TestFlight build number: #{ex.message}"
       increment_build_number(
         xcodeproj: "ios/smbmobile.xcodeproj"
       )
     end
 
-    # Build directly targeting the project/target (bypasses scheme destination validation)
     archive_path = "#{Dir.pwd}/../ios/build/smbmobile.xcarchive"
-    build_dir = "#{Dir.pwd}/../ios/build"
     
-    UI.message "🔨 Building iOS app using workspace (required for CocoaPods)..."
-    UI.message "Using Xcode 16.1 with generic iOS device destination"
-    UI.message ""
-    
-    # Build using workspace - REQUIRED for CocoaPods to include all Expo module dependencies
-    # Using generic/platform=iOS destination to avoid simulator runtime requirement
-    # Code signing is configured per-target via update_code_signing_settings above
-    begin
-      sh("cd #{Dir.pwd}/.. && " \
-         "xcodebuild archive " \
-         "-workspace ./ios/smbmobile.xcworkspace " \
-         "-scheme smbmobile " \
-         "-configuration Release " \
-         "-destination 'generic/platform=iOS' " \
-         "-archivePath '#{archive_path}' " \
-         "ONLY_ACTIVE_ARCH=NO " \
-         "ENABLE_BITCODE=NO " \
-         "COMPILER_INDEX_STORE_ENABLE=NO " \
-         "-allowProvisioningUpdates")
-      
-      UI.success "✅ Archive created successfully!"
-    rescue => ex
-      UI.error "❌ Build failed:"
-      UI.error ex.message
-      UI.error ""
-      UI.error "Build failed with Xcode 16.1 using workspace."
-      UI.error "This could be due to:"
-      UI.error "1. Missing iOS dependencies in pod install"
-      UI.error "2. Xcode 16.1 configuration issues on GitHub Actions"
-      UI.error "3. Code signing or provisioning profile problems"
-      raise ex
-    end
-    
-    UI.success "✅ Archive created at: #{archive_path}"
-    UI.message "📦 Exporting IPA for App Store distribution..."
+    sh("cd #{Dir.pwd}/.. && " \
+       "xcodebuild archive " \
+       "-workspace ./ios/smbmobile.xcworkspace " \
+       "-scheme smbmobile " \
+       "-configuration Release " \
+       "-destination 'generic/platform=iOS' " \
+       "-archivePath '#{archive_path}' " \
+       "ONLY_ACTIVE_ARCH=NO " \
+       "ENABLE_BITCODE=NO " \
+       "COMPILER_INDEX_STORE_ENABLE=NO " \
+       "-allowProvisioningUpdates")
     
     # Export the archive to IPA
     build_ios_app(
