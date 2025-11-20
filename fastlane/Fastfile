@@ -16,17 +16,35 @@ platform :android do
 
   desc "Submit a new internal test build to play store"
   lane :qa_release do
-    previous_build_number = google_play_track_version_codes(
-      track: "internal",
-      json_key: "credentials/android/google-play-service-key.json"
-    )[0]
+    # Get the highest version code from Google Play Console (across all tracks)
+    begin
+      latest_version_code = google_play_track_version_codes(
+        track: "internal",
+        json_key: "credentials/android/google-play-service-key.json"
+      )[0]
+      
+      UI.message "📊 Latest version code on internal track: #{latest_version_code}"
+      
+      # Set to latest + 1, ensuring we always increment
+      new_version_code = latest_version_code + 1
+      
+    rescue => ex
+      UI.important "⚠️ Could not fetch latest version code from Play Store: #{ex.message}"
+      UI.message "Reading current version code from build.gradle instead"
+      
+      # Fallback: read current version from gradle and increment
+      current_version = get_version_code(gradle_file_path: "android/app/build.gradle")
+      new_version_code = current_version.to_i + 1
+    end
+
+    UI.success "✅ New version code will be: #{new_version_code}"
 
     increment_version_name(
       gradle_file_path: "android/app/build.gradle"
     )
     increment_version_code(
       gradle_file_path: "android/app/build.gradle",
-      version_code: previous_build_number + 1
+      version_code: new_version_code
     )
 
     gradle(task: "clean bundleRelease", project_dir: "./android", properties: {
@@ -36,12 +54,21 @@ platform :android do
       "android.injected.signing.key.password" => ENV['ANDROID_KEY_PASSWORD']
     })
 
+    # Verify the version code was actually updated
+    final_version_code = get_version_code(gradle_file_path: "android/app/build.gradle")
+    UI.message "📦 Built AAB with version code: #{final_version_code}"
+
     upload_to_play_store(
       track: 'internal',
       json_key: "credentials/android/google-play-service-key.json",
-      aab: "android/app/build/outputs/bundle/release/app-release.aab"
+      aab: "android/app/build/outputs/bundle/release/app-release.aab",
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
     )
 
+    UI.success "✅ Successfully uploaded version #{final_version_code} to Play Store (internal track)"
+    
     changelog_from_git_commits
   end
 
