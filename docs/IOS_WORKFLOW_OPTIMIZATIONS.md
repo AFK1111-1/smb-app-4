@@ -352,7 +352,7 @@ Once build is stable, remove:
 
 ```yaml
 # ❌ Remove after confirming build stability
-- name: Debug FASTLANE_PASSWORD Before Decode
+- name: Debug APP_STORE_CONNECT_API_KEY_BASE64 Before Decode
 - name: Debug Apple Key File
 - name: Debug - Log Environment Variables
 ```
@@ -521,7 +521,7 @@ jobs:
           mkdir -p credentials/ios
           
           # AuthKey.p8
-          base64_content=$(echo "$FASTLANE_PASSWORD" | \
+          base64_content=$(echo "$APP_STORE_CONNECT_API_KEY_BASE64" | \
             sed 's/-----BEGIN PRIVATE KEY-----//g' | \
             sed 's/-----END PRIVATE KEY-----//g' | \
             tr -d ' \n\r\t')
@@ -538,7 +538,7 @@ jobs:
           # Google Services
           echo "$IOS_GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > GoogleService-Info.plist
         env:
-          FASTLANE_PASSWORD: ${{ env.FASTLANE_PASSWORD }}
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ env.APP_STORE_CONNECT_API_KEY_BASE64 }}
           FASTLANE_MATCH_DEPLOY_KEY: ${{ env.FASTLANE_MATCH_DEPLOY_KEY }}
           IOS_GOOGLE_SERVICE_INFO_PLIST: ${{ env.IOS_GOOGLE_SERVICE_INFO_PLIST }}
       

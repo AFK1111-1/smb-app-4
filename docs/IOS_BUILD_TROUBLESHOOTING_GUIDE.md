@@ -80,7 +80,7 @@ Clean and reformat the `.p8` file programmatically:
 
 ```bash
 # Extract base64 content: remove headers and all spaces/newlines
-base64_content=$(echo "$FASTLANE_PASSWORD" | \
+base64_content=$(echo "$APP_STORE_CONNECT_API_KEY_BASE64" | \
   sed 's/-----BEGIN PRIVATE KEY-----//g' | \
   sed 's/-----END PRIVATE KEY-----//g' | \
   tr -d ' \n\r\t')

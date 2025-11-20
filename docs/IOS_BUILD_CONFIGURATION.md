@@ -44,7 +44,7 @@ Base64-encoded JSON containing all environment variables:
   "APP_STORE_CONNECT_API_KEY_ID": "ABC123XYZ",
   "APP_STORE_CONNECT_ISSUER_ID": "12345678-1234-1234-1234-123456789012",
   "MATCH_PASSWORD": "your-match-repo-password",
-  "FASTLANE_PASSWORD": "-----BEGIN PRIVATE KEY-----\nMIGT...base64content...\n-----END PRIVATE KEY-----",
+  "APP_STORE_CONNECT_API_KEY_BASE64": "-----BEGIN PRIVATE KEY-----\nMIGT...base64content...\n-----END PRIVATE KEY-----",
   "FASTLANE_MATCH_DEPLOY_KEY": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----",
   "IOS_GOOGLE_SERVICE_INFO_PLIST": "base64-encoded-plist",
   "GITHUB_TOKEN": "${{ secrets.GITHUB_TOKEN }}"
@@ -74,7 +74,7 @@ cat secrets.json | base64 > encoded_secret.txt
 | `APP_STORE_CONNECT_API_KEY_ID` | App Store Connect API Key ID | Plain text (e.g., `ABC123XYZ`) |
 | `APP_STORE_CONNECT_ISSUER_ID` | App Store Connect Issuer ID | UUID format |
 | `MATCH_PASSWORD` | Password for encrypted Match repository | Plain text |
-| `FASTLANE_PASSWORD` | Apple API private key (.p8 file) | PEM format (multiline) |
+| `APP_STORE_CONNECT_API_KEY_BASE64` | Apple API private key (.p8 file) | PEM format (multiline) |
 | `FASTLANE_MATCH_DEPLOY_KEY` | SSH private key for Match repo access | OpenSSH private key format |
 | `IOS_GOOGLE_SERVICE_INFO_PLIST` | Firebase config for iOS | Base64-encoded plist |
 
@@ -152,7 +152,7 @@ jobs:
     mkdir -p credentials/ios
     
     # Extract base64 content: remove headers and all spaces/newlines
-    base64_content=$(echo "$FASTLANE_PASSWORD" | \
+    base64_content=$(echo "$APP_STORE_CONNECT_API_KEY_BASE64" | \
       sed 's/-----BEGIN PRIVATE KEY-----//g' | \
       sed 's/-----END PRIVATE KEY-----//g' | \
       tr -d ' \n\r\t')
@@ -162,7 +162,7 @@ jobs:
     echo "$base64_content" | fold -w 64 >> credentials/ios/AuthKey.p8
     echo "-----END PRIVATE KEY-----" >> credentials/ios/AuthKey.p8
   env:
-    FASTLANE_PASSWORD: ${{ env.FASTLANE_PASSWORD }}
+    APP_STORE_CONNECT_API_KEY_BASE64: ${{ env.APP_STORE_CONNECT_API_KEY_BASE64 }}
 ```
 
 #### C. SSH Key Setup
@@ -625,7 +625,7 @@ fastlane/*.p12
 | `MATCH_PASSWORD` | Fastlane Match | Decrypt certificates repository |
 | `KEYCHAIN_PASSWORD` | Fastlane Match | Access temporary keychain |
 | `KEYCHAIN_NAME` | Fastlane Match | Specify which keychain to use |
-| `FASTLANE_PASSWORD` | Workflow | AuthKey.p8 file content |
+| `APP_STORE_CONNECT_API_KEY_BASE64` | Workflow | AuthKey.p8 file content |
 | `FASTLANE_MATCH_DEPLOY_KEY` | Workflow | SSH key for Match repo |
 
 ### Optional Variables

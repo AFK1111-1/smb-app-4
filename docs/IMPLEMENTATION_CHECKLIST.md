@@ -46,7 +46,7 @@ Quick action checklist for implementing optimizations and cleanup tasks.
 
 **File**: `.github/workflows/this-smb-4-0a6edfc_custom-staging_app_d05935d_env_3a67391.yaml`
 
-- [ ] Remove: `Debug FASTLANE_PASSWORD Before Decode` step (lines ~508-532)
+- [ ] Remove: `Debug APP_STORE_CONNECT_API_KEY_BASE64 Before Decode` step (lines ~508-532)
 - [ ] Remove: `Debug Apple Key File` step (lines ~565-577)
 - [ ] Keep: `Debug - Log Environment Variables` (but make conditional)
 
