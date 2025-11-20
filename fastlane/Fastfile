@@ -205,50 +205,20 @@ platform :ios do
     # Get actual Xcode version being used
     xcode_version = sh("xcodebuild -version | head -n 1").strip
     
-    UI.message "🔨 Building iOS app using workspace (required for CocoaPods)..."
-    UI.message "Using #{xcode_version} with iphoneos SDK"
+    UI.message "🔨 Building iOS app using gym (Fastlane's build tool)..."
+    UI.message "Using #{xcode_version}"
     UI.message ""
     
-    # Build using workspace - REQUIRED for CocoaPods to include all Expo module dependencies
-    # Using -sdk iphoneos instead of -destination to avoid iOS runtime requirement
-    # Code signing is configured per-target via update_code_signing_settings above
-    begin
-      sh("cd #{Dir.pwd}/.. && " \
-         "xcodebuild archive " \
-         "-workspace ./ios/smbmobile.xcworkspace " \
-         "-scheme smbmobile " \
-         "-configuration Release " \
-         "-sdk iphoneos " \
-         "-archivePath '#{archive_path}' " \
-         "ONLY_ACTIVE_ARCH=NO " \
-         "ENABLE_BITCODE=NO " \
-         "COMPILER_INDEX_STORE_ENABLE=NO " \
-         "-allowProvisioningUpdates")
-      
-      UI.success "✅ Archive created successfully!"
-    rescue => ex
-      UI.error "❌ Build failed:"
-      UI.error ex.message
-      UI.error ""
-      UI.error "Build failed using workspace."
-      UI.error "This could be due to:"
-      UI.error "1. Missing iOS dependencies in pod install"
-      UI.error "2. Xcode/iOS SDK configuration issues on GitHub Actions"
-      UI.error "3. Code signing or provisioning profile problems"
-      raise ex
-    end
-    
-    UI.success "✅ Archive created at: #{archive_path}"
-    UI.message "📦 Exporting IPA for App Store distribution..."
-    
-    # Export the archive to IPA
+    # Use gym (build_ios_app) which handles destinations and scheme configuration automatically
+    # This is more reliable than raw xcodebuild commands in CI environments
     build_ios_app(
-      skip_build_archive: true,
-      archive_path: archive_path,
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
+      configuration: "Release",
       export_method: "app-store",
       output_directory: "./ios/build",
+      archive_path: "./ios/build/smbmobile.xcarchive",
+      output_name: "smbmobile.ipa",
       export_options: {
         method: "app-store",
         provisioningProfiles: {
@@ -256,7 +226,11 @@ platform :ios do
         },
         teamID: "96W7U4JYV4"
       },
-      output_name: "smbmobile.ipa"
+      buildlog_path: "./ios/build/logs",
+      xcargs: "ONLY_ACTIVE_ARCH=NO ENABLE_BITCODE=NO COMPILER_INDEX_STORE_ENABLE=NO",
+      skip_profile_detection: true,
+      include_symbols: true,
+      include_bitcode: false
     )
 
     upload_to_testflight(
