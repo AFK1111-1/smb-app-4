@@ -818,7 +818,7 @@ jobs:
     needs:
       - _status_testing
     permissions: write-all
-    runs-on: macos-latest
+    runs-on: macos-15
   deploy:
     name: deploy
     steps:
