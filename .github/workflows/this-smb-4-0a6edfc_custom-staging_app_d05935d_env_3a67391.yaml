@@ -674,16 +674,26 @@ jobs:
           xcrun simctl list runtimes | grep iOS || echo "No iOS runtimes found"
           
           echo ""
-          echo "📥 Installing iOS 18.1 simulator runtime..."
-          sudo xcodebuild -downloadPlatform iOS || echo "Platform download failed or already exists"
+          echo "📥 Installing iOS 18.1 simulator runtime (this may take 2-3 minutes)..."
+          sudo xcodebuild -downloadPlatform iOS &
+          DOWNLOAD_PID=$!
+          
+          echo "Download started with PID: $DOWNLOAD_PID"
+          echo "⏳ Waiting for download to complete..."
+          
+          # Wait for the process to complete
+          wait $DOWNLOAD_PID || echo "Download process finished"
           
           echo ""
-          echo "⏳ Waiting for runtime installation to complete..."
-          sleep 10
+          echo "⏳ Giving Xcode 30 seconds to finalize runtime installation..."
+          sleep 30
           
           echo ""
           echo "📋 Available simulator runtimes AFTER install:"
           xcrun simctl list runtimes | grep iOS || echo "No iOS runtimes found"
+          
+          echo ""
+          echo "✅ Runtime installation complete!"
       
       - name: Verify Xcode Setup
         run: |
@@ -782,6 +792,8 @@ jobs:
           MATCH_PASSWORD: ${{ env.MATCH_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ env.KEYCHAIN_PASSWORD }}
           KEYCHAIN_NAME: ${{ env.KEYCHAIN_NAME }}
+          FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: 60
+          FASTLANE_XCODEBUILD_SETTINGS_RETRIES: 6
       
       - name: Cleanup temporary keychain
         if: always()
