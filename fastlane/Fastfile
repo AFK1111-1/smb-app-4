@@ -122,29 +122,50 @@ platform :ios do
       bump_type: "patch"
     )
     
+    # Get the latest build number from TestFlight and increment from there
+    begin
+      latest_build = latest_testflight_build_number(
+        app_identifier: "com.insighture.smbmobile",
+        api_key: api_key
+      )
+      UI.message "📊 Latest TestFlight build number: #{latest_build}"
+      
+      # Set build number to latest + 1
+      increment_build_number(
+        xcodeproj: "ios/smbmobile.xcodeproj",
+        build_number: latest_build + 1
+      )
+      UI.success "✅ Build number set to: #{latest_build + 1}"
+    rescue => ex
+      UI.important "⚠️  Could not fetch latest TestFlight build number: #{ex.message}"
+      UI.message "Using increment from Xcode project instead"
+      increment_build_number(
+        xcodeproj: "ios/smbmobile.xcodeproj"
+      )
+    end
 
-    # Build directly targeting the project/target (bypasses scheme destination validation)
-    archive_path = "#{Dir.pwd}/../ios/build/smbmobile.xcarchive"
-    build_dir = "#{Dir.pwd}/../ios/build"
+    # Build and export iOS app using gym
+    UI.message "🔨 Building and exporting iOS app..."
     
-    
-    # Export the archive to IPA
     build_ios_app(
-      skip_build_archive: true,
-      archive_path: archive_path,
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
+      configuration: "Release",
+      sdk: "iphoneos",
       export_method: "app-store",
       output_directory: "./ios/build",
+      output_name: "smbmobile.ipa",
       export_options: {
         method: "app-store",
         provisioningProfiles: {
           "com.insighture.smbmobile" => "match AppStore com.insighture.smbmobile"
         },
-        # teamID: "96W7U4JYV4"
+        teamID: "96W7U4JYV4"
       },
-      output_name: "smbmobile.ipa"
+      xcargs: "ONLY_ACTIVE_ARCH=NO ENABLE_BITCODE=NO COMPILER_INDEX_STORE_ENABLE=NO"
     )
+    
+    UI.success "✅ iOS app built and exported successfully!"
 
     upload_to_testflight(
       skip_waiting_for_build_processing: true
