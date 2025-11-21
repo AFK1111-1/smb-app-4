@@ -150,8 +150,8 @@ platform :ios do
     archive_path = File.expand_path("../ios/build/smbmobile.xcarchive")
     
     sh(
-      "xcodebuild archive " \
-      "-workspace ios/smbmobile.xcworkspace " \
+      "cd .. && xcodebuild archive " \
+      "-workspace ./ios/smbmobile.xcworkspace " \
       "-scheme smbmobile " \
       "-configuration Release " \
       "-sdk iphoneos " \
