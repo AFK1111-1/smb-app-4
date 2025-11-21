@@ -183,7 +183,7 @@ platform :ios do
      UI.message ""
     
      # Build using workspace - REQUIRED for CocoaPods to include all Expo module dependencies
-     # Using -sdk iphoneos (without destination) to work with available iOS SDK
+     # Explicitly specify iOS 18.0 SDK (available with Xcode 16.0) to avoid version mismatch
      # Code signing is configured per-target via update_code_signing_settings above
      begin
        sh("cd #{Dir.pwd}/.. && " \
@@ -191,7 +191,8 @@ platform :ios do
           "-workspace ./ios/smbmobile.xcworkspace " \
           "-scheme smbmobile " \
           "-configuration Release " \
-          "-sdk iphoneos " \
+          "-destination 'generic/platform=iOS' " \
+          "-sdk iphoneos18.0 " \
           "-archivePath '#{archive_path}' " \
           "ONLY_ACTIVE_ARCH=NO " \
           "ENABLE_BITCODE=NO " \
