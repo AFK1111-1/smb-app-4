@@ -20,7 +20,7 @@ platform :android do
       latest_version_code = google_play_track_version_codes(
         track: "internal",
         json_key: "credentials/android/google-play-service-key.json"
-      ).max
+      )[0]
       
       new_version_code = latest_version_code + 1
       
