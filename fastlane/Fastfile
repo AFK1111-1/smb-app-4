@@ -16,38 +16,18 @@ platform :android do
 
   desc "Submit a new internal test build to play store"
   lane :qa_release do
-    # Get the highest version code from Google Play Console (across all tracks)
-    begin
-      latest_version_code = google_play_track_version_codes(
-        track: "internal",
-        json_key: "credentials/android/google-play-service-key.json"
-      )[0]
-      
-      UI.message "📊 Latest version code on internal track: #{latest_version_code}"
-      
-      # Set to latest + 1, ensuring we always increment
-      new_version_code = latest_version_code + 1
-      
-    rescue => ex
-      UI.important "⚠️ Could not fetch latest version code from Play Store: #{ex.message}"
-      UI.message "Reading current version code from build.gradle instead"
-      
-      # Fallback: read current version from gradle and increment
-      current_version = get_version_code(gradle_file_path: "android/app/build.gradle")
-      new_version_code = current_version.to_i + 1
-    end
-
-    UI.success "✅ New version code will be: #{new_version_code}"
+    previous_build_number = google_play_track_version_codes(
+      track: "internal",
+      json_key: "credentials/android/google-play-service-key.json"
+    )[0]
 
     increment_version_name(
       gradle_file_path: "android/app/build.gradle"
     )
     increment_version_code(
       gradle_file_path: "android/app/build.gradle",
-      version_code: new_version_code
+      version_code: previous_build_number + 1
     )
-
-    UI.message "📦 Building AAB with version code: #{new_version_code}"
 
     gradle(task: "clean bundleRelease", project_dir: "./android", properties: {
       "android.injected.signing.store.file" => "#{Dir.pwd}/../credentials/android/release.keystore",
@@ -55,41 +35,9 @@ platform :android do
       "android.injected.signing.key.alias" => ENV['ANDROID_KEY_ALIAS'],
       "android.injected.signing.key.password" => ENV['ANDROID_KEY_PASSWORD']
     })
-
-    UI.success "✅ AAB built successfully with version code: #{new_version_code}"
 
     upload_to_play_store(
       track: 'internal',
-      json_key: "credentials/android/google-play-service-key.json",
-      aab: "android/app/build/outputs/bundle/release/app-release.aab",
-      skip_upload_metadata: true,
-      skip_upload_images: true,
-      skip_upload_screenshots: true
-    )
-
-    UI.success "✅ Successfully uploaded version #{new_version_code} to Play Store (internal track)"
-    
-    changelog_from_git_commits
-  end
-
-  desc "Submit a new staging build to play store"
-  lane :stg_release do
-    increment_version_name(
-      gradle_file_path: "android/app/build.gradle"
-    )
-    increment_version_code(
-      gradle_file_path: "android/app/build.gradle"
-    )
-
-    gradle(task: "clean bundleRelease", project_dir: "./android", properties: {
-      "android.injected.signing.store.file" => "#{Dir.pwd}/../credentials/android/release.keystore",
-      "android.injected.signing.store.password" => ENV['ANDROID_KEYSTORE_PASSWORD'],
-      "android.injected.signing.key.alias" => ENV['ANDROID_KEY_ALIAS'],
-      "android.injected.signing.key.password" => ENV['ANDROID_KEY_PASSWORD']
-    })
-
-    upload_to_play_store(
-      track: 'closed',
       json_key: "credentials/android/google-play-service-key.json",
       aab: "android/app/build/outputs/bundle/release/app-release.aab"
     )
