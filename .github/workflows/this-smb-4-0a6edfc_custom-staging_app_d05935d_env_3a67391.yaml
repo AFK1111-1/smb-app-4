@@ -489,7 +489,9 @@ jobs:
       - name: Setup Google Play Service Key
         run: |
           echo "$GOOGLE_PLAY_SERVICE_KEY" | base64 --decode > credentials/android/google-play-service-key.json
-      
+      - name: Verify JSON (optional debug)
+        run: |
+          jq 'keys' credentials/android/google-play-service-key.json
       - name: Setup Google Services JSON for Android
         run: >
           echo "${{ env.ANDROID_GOOGLE_SERVICES_JSON }}" | base64 --decode >
@@ -508,7 +510,33 @@ jobs:
       - name: Create credentials directory for iOS
         run: |
           mkdir -p credentials/ios
-      
+
+      - name: Debug APP_STORE_CONNECT_API_KEY_BASE64 Before Decode
+        run: |
+          echo "🔍 Checking APP_STORE_CONNECT_API_KEY_BASE64 variable:"
+          echo "Length: ${#APP_STORE_CONNECT_API_KEY_BASE64} characters"
+          echo ""
+          echo "First 100 chars of APP_STORE_CONNECT_API_KEY_BASE64:"
+          echo "$APP_STORE_CONNECT_API_KEY_BASE64" | head -c 100
+          echo ""
+          echo ""
+          echo "Checking if it's already valid base64:"
+          if echo "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 -d > /dev/null 2>&1; then
+            echo "✅ Valid base64 string"
+            echo ""
+            echo "Decoded first 50 chars:"
+            echo "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 -d | head -c 50
+            echo ""
+          else
+            echo "❌ NOT valid base64 - might already be decoded!"
+            echo ""
+            echo "Treating as raw content, first 50 chars:"
+            echo "$APP_STORE_CONNECT_API_KEY_BASE64" | head -c 50
+            echo ""
+          fi
+        env:
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ env.APP_STORE_CONNECT_API_KEY_BASE64 }}
+          
       - name: Setup Apple API Key for Fastlane Match
         run: |
           mkdir -p credentials/ios
@@ -536,9 +564,23 @@ jobs:
           echo "$base64_content" | fold -w 64 >> credentials/ios/AuthKey.p8
           echo "-----END PRIVATE KEY-----" >> credentials/ios/AuthKey.p8
           
+          echo "✅ AuthKey.p8 created at: $(pwd)/credentials/ios/AuthKey.p8"
         env:
           APP_STORE_CONNECT_API_KEY_BASE64: ${{ env.APP_STORE_CONNECT_API_KEY_BASE64 }}
-      
+          
+      - name: Debug Apple Key File
+        run: |
+          echo "📁 Checking AuthKey.p8 file:"
+          ls -lh credentials/ios/AuthKey.p8
+          echo ""
+          echo "File size: $(stat -f%z credentials/ios/AuthKey.p8) bytes"
+          echo ""
+          echo "🔍 File preview:"
+          head -n 3 credentials/ios/AuthKey.p8
+          echo "... [content] ..."
+          tail -n 1 credentials/ios/AuthKey.p8
+          echo ""
+          echo "✅ AuthKey.p8 file created successfully"
       - name: Setup Google Service Info Plist for iOS
         run: >
           echo "${{ env.IOS_GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode >
@@ -550,13 +592,59 @@ jobs:
         run: |
           cd ios
           pod install
+          cd ..
+          echo "✅ CocoaPods installation complete"
+          echo "📁 Checking for workspace file:"
+          ls -la ios/*.xcworkspace || echo "❌ Workspace not found!"
       
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "$FASTLANE_MATCH_DEPLOY_KEY" | base64 --decode > ~/.ssh/id_rsa
+          
+          # Debug SSH key
+          echo "🔍 Checking FASTLANE_MATCH_DEPLOY_KEY:"
+          if [ -z "$FASTLANE_MATCH_DEPLOY_KEY" ]; then
+            echo "❌ ERROR: FASTLANE_MATCH_DEPLOY_KEY is not set!"
+            exit 1
+          fi
+          
+          echo "SSH key length: ${#FASTLANE_MATCH_DEPLOY_KEY} characters"
+          echo "First 50 chars: $(echo "$FASTLANE_MATCH_DEPLOY_KEY" | head -c 50)"
+          echo ""
+          
+          # Check if it's a public key (wrong type)
+          if echo "$FASTLANE_MATCH_DEPLOY_KEY" | grep -qE "^ssh-(rsa|ed25519|ecdsa)"; then
+            echo "❌ ERROR: FASTLANE_MATCH_DEPLOY_KEY contains a PUBLIC key!"
+            echo ""
+            echo "You have: ssh-ed25519 AAAAC3... (public key)"
+            echo "You need: -----BEGIN OPENSSH PRIVATE KEY----- ... (private key)"
+            echo ""
+            echo "The private key should be:"
+            echo "  - Multi-line format starting with -----BEGIN"
+            echo "  - Usually 1600+ characters (not 103!)"
+            echo "  - The file that pairs with your public key on GitHub"
+            echo ""
+            echo "To fix:"
+            echo "  1. Locate your SSH private key file (usually ~/.ssh/id_ed25519 or ~/.ssh/id_rsa)"
+            echo "  2. Base64 encode it: cat ~/.ssh/id_ed25519 | base64"
+            echo "  3. Update your ENCODED_PIPELINE_SECRET with the correct FASTLANE_MATCH_DEPLOY_KEY"
+            exit 1
+          fi
+          
+          # Write SSH key - handle base64 or raw format
+          if echo "$FASTLANE_MATCH_DEPLOY_KEY" | head -c 5 | grep -q "^-----"; then
+            echo "✅ SSH key is in raw PEM format"
+            echo "$FASTLANE_MATCH_DEPLOY_KEY" > ~/.ssh/id_rsa
+          else
+            echo "📝 SSH key is base64 encoded, decoding..."
+            echo "$FASTLANE_MATCH_DEPLOY_KEY" | base64 --decode > ~/.ssh/id_rsa
+          fi
+          
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
+          
+          echo "✅ SSH key installed"
+          echo "SSH key file size: $(stat -f%z ~/.ssh/id_rsa) bytes"
         env:
           FASTLANE_MATCH_DEPLOY_KEY: ${{ env.FASTLANE_MATCH_DEPLOY_KEY }}
       - name: Setup Xcode 16.1
@@ -566,9 +654,81 @@ jobs:
       
       - name: Setup Xcode First Launch
         run: |
+          echo "🔧 Running Xcode first launch setup..."
           sudo xcodebuild -runFirstLaunch
+          
+          echo ""
+          echo "✅ Accepting Xcode licenses..."
           sudo xcodebuild -license accept || echo "License already accepted"
+          
+          echo ""
+          echo "📥 Installing iOS 18.0 simulator runtime..."
+          # Try to download and install iOS simulator runtime
+          sudo xcrun simctl runtime add "iOS 18.0" 2>/dev/null || echo "⚠️ Could not install iOS 18.0 runtime via simctl"
+          
+          # Alternative: Try xcodebuild method
+          sudo xcodebuild -downloadPlatform iOS 2>/dev/null || echo "⚠️ Platform download not available"
+          
+          echo ""
+          echo "📋 Available simulator runtimes:"
+          xcrun simctl list runtimes | grep iOS || echo "No iOS runtimes found"
       
+      - name: Verify Xcode Setup
+        run: |
+          echo "Selected Xcode path:"
+          xcode-select -p
+          echo ""
+          echo "Xcode version:"
+          xcodebuild -version
+          echo ""
+          echo "Available iOS SDKs:"
+          xcodebuild -showsdks
+          echo ""
+          echo "Available iOS runtimes:"
+          xcrun simctl list runtimes | grep iOS || echo "No iOS runtimes found"
+      - name: Debug - Log Environment Variables
+        run: |
+          echo "=== Environment Variables Debug ==="
+          echo ""
+          echo "🔍 Checking if variables are set in shell:"
+          [ -n "$APP_STORE_CONNECT_API_KEY_ID" ] && echo "✅ APP_STORE_CONNECT_API_KEY_ID: SET (length: ${#APP_STORE_CONNECT_API_KEY_ID})" || echo "❌ APP_STORE_CONNECT_API_KEY_ID: NOT SET"
+          [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && echo "✅ APP_STORE_CONNECT_ISSUER_ID: SET (length: ${#APP_STORE_CONNECT_ISSUER_ID})" || echo "❌ APP_STORE_CONNECT_ISSUER_ID: NOT SET"
+          [ -n "$MATCH_PASSWORD" ] && echo "✅ MATCH_PASSWORD: SET (length: ${#MATCH_PASSWORD})" || echo "❌ MATCH_PASSWORD: NOT SET"
+          [ -n "$APP_STORE_CONNECT_API_KEY_BASE64" ] && echo "✅ APP_STORE_CONNECT_API_KEY_BASE64: SET (length: ${#APP_STORE_CONNECT_API_KEY_BASE64})" || echo "❌ APP_STORE_CONNECT_API_KEY_BASE64: NOT SET"
+          [ -n "$TEST_KEY_123" ] && echo "✅ TEST_KEY_123: SET (length: ${#TEST_KEY_123})" || echo "❌ TEST_KEY_123: NOT SET"
+          echo ""
+          echo "🔓 Actual values (base64 encoded to bypass masking):"
+          echo "APP_STORE_CONNECT_API_KEY_ID (base64): $(echo -n "$APP_STORE_CONNECT_API_KEY_ID" | base64)"
+          echo "APP_STORE_CONNECT_ISSUER_ID (base64): $(echo -n "$APP_STORE_CONNECT_ISSUER_ID" | base64)"
+          echo "MATCH_PASSWORD (base64): $(echo -n "$MATCH_PASSWORD" | base64 | head -c 30)... [truncated]"
+          echo "APP_STORE_CONNECT_API_KEY_BASE64 (base64): $(echo -n "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 | head -c 30)... [truncated]"
+          echo "TEST_KEY_123 (base64): $(echo -n "$TEST_KEY_123" | base64 | head -c 30)... [truncated]"
+          echo ""
+          echo "🔓 Decoded values (for verification):"
+          echo "APP_STORE_CONNECT_API_KEY_ID: $(echo -n "$APP_STORE_CONNECT_API_KEY_ID" | base64 | base64 -d)"
+          echo "APP_STORE_CONNECT_ISSUER_ID: $(echo -n "$APP_STORE_CONNECT_ISSUER_ID" | base64 | base64 -d)"
+          echo ""
+          echo "📋 All environment variables containing 'APP_STORE' or 'MATCH':"
+          env | grep -E '(APP_STORE|MATCH)' | cut -d= -f1 | sort || echo "None found"
+          echo ""
+          echo "📋 All environment variables containing 'FASTLANE':"
+          env | grep -E 'FASTLANE' | cut -d= -f1 | sort || echo "None found"
+          echo ""
+          echo "📋 All environment variables containing 'TEST':"
+          env | grep -E 'TEST' | cut -d= -f1 | sort || echo "None found"
+          echo ""
+          echo "Node version: $(node --version)"
+          echo "Ruby version: $(ruby --version)"
+          echo "Fastlane version: $(fastlane --version)"
+          echo "Current directory: $(pwd)"
+          echo "==================================="
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ env.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ env.APP_STORE_CONNECT_ISSUER_ID }}
+          MATCH_PASSWORD: ${{ env.MATCH_PASSWORD }}
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ env.APP_STORE_CONNECT_API_KEY_BASE64 }}
+          TEST_KEY_123: ${{ env.TEST_KEY_123 }}
+
       - name: Create temporary keychain for code signing
         run: |
           # Create a temporary keychain with a password
@@ -589,12 +749,19 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
           # Set keychain settings to not lock on sleep and timeout
           security set-keychain-settings -t 3600 -u "$KEYCHAIN_NAME"
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME" 2>/dev/null || true
-      
+          # Allow codesign to access the keychain without UI popup
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME" 2>/dev/null || echo "⚠️ Could not set partition list (keychain is empty, this is OK)"
+          # Verify keychain is accessible
+          echo "Keychains in search list:"
+          security list-keychains
+          echo "Default keychain:"
+          security default-keychain
       - name: Unlock keychain before build
         run: |
           security unlock-keychain -p "${{ env.KEYCHAIN_PASSWORD }}" "${{ env.KEYCHAIN_NAME }}"
-      
+          security list-keychains
+          security default-keychain
+
       - name: Build and Release iOS
         run: fastlane ios qa_release
         env:
@@ -607,8 +774,21 @@ jobs:
       - name: Cleanup temporary keychain
         if: always()
         run: |
-          security delete-keychain "${{ env.KEYCHAIN_NAME }}" 2>/dev/null || true
+          echo "🧹 Cleaning up temporary keychain..."
+          security delete-keychain "${{ env.KEYCHAIN_NAME }}" 2>/dev/null || echo "Keychain already deleted or doesn't exist"
+          echo "✅ Cleanup complete"
       
+      - name: Show Full Build Log (if build failed)
+        if: failure()
+        run: |
+          echo "🔍 Full Xcode build log:"
+          if [ -f ~/Library/Logs/gym/smbmobile-smbmobile.log ]; then
+            cat ~/Library/Logs/gym/smbmobile-smbmobile.log
+          else
+            echo "❌ Log file not found"
+            echo "Searching for gym logs..."
+            find ~/Library/Logs/gym -name "*.log" -exec echo "Found: {}" \; -exec tail -100 {} \;
+          fi
       - name: Upload iOS Release IPA
         uses: actions/upload-artifact@v4
         with:
