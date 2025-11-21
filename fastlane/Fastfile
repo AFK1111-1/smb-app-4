@@ -174,55 +174,19 @@ platform :ios do
       )
     end
 
-    # Build directly targeting the project/target (bypasses scheme destination validation)
-    archive_path = "#{Dir.pwd}/../ios/build/smbmobile.xcarchive"
-    build_dir = "#{Dir.pwd}/../ios/build"
-    
-     UI.message "🔨 Building iOS app using workspace (required for CocoaPods)..."
-     UI.message "Using Xcode 16.0 with iOS SDK"
-     UI.message ""
-    
-     # Build using workspace - REQUIRED for CocoaPods to include all Expo module dependencies
-     # Explicitly specify iOS 18.0 SDK (available with Xcode 16.0) to avoid version mismatch
-     # Code signing is configured per-target via update_code_signing_settings above
-     begin
-       sh("cd #{Dir.pwd}/.. && " \
-          "xcodebuild archive " \
-          "-workspace ./ios/smbmobile.xcworkspace " \
-          "-scheme smbmobile " \
-          "-configuration Release " \
-          "-destination 'generic/platform=iOS' " \
-          "-sdk iphoneos18.0 " \
-          "-archivePath '#{archive_path}' " \
-          "ONLY_ACTIVE_ARCH=NO " \
-          "ENABLE_BITCODE=NO " \
-          "COMPILER_INDEX_STORE_ENABLE=NO " \
-          "-allowProvisioningUpdates")
-      
-      UI.success "✅ Archive created successfully!"
-     rescue => ex
-       UI.error "❌ Build failed:"
-       UI.error ex.message
-       UI.error ""
-       UI.error "Build failed with Xcode 16.0 using workspace."
-       UI.error "This could be due to:"
-       UI.error "1. Missing iOS dependencies in pod install"
-       UI.error "2. Xcode 16.0 configuration issues on GitHub Actions"
-       UI.error "3. Code signing or provisioning profile problems"
-       raise ex
-     end
-    
-    UI.success "✅ Archive created at: #{archive_path}"
-    UI.message "📦 Exporting IPA for App Store distribution..."
-    
-    # Export the archive to IPA
+    UI.message "🔨 Building and archiving iOS app..."
+    UI.message "Using Xcode 16.1 - letting gym auto-detect best build strategy"
+    UI.message ""
+   
+    # Let gym handle both archiving AND exporting in one step
+    # This avoids manual destination issues
     build_ios_app(
-      skip_build_archive: true,
-      archive_path: archive_path,
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
+      configuration: "Release",
       export_method: "app-store",
       output_directory: "./ios/build",
+      output_name: "smbmobile.ipa",
       export_options: {
         method: "app-store",
         provisioningProfiles: {
@@ -230,8 +194,11 @@ platform :ios do
         },
         teamID: "96W7U4JYV4"
       },
-      output_name: "smbmobile.ipa"
+      xcargs: "ONLY_ACTIVE_ARCH=NO ENABLE_BITCODE=NO COMPILER_INDEX_STORE_ENABLE=NO",
+      skip_profile_detection: true
     )
+   
+    UI.success "✅ iOS app built and exported successfully!"
 
     upload_to_testflight(
       skip_waiting_for_build_processing: true

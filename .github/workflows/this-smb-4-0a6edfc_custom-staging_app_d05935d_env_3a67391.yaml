@@ -655,10 +655,10 @@ jobs:
           echo "SSH key file size: $(stat -f%z ~/.ssh/id_rsa) bytes"
         env:
           FASTLANE_MATCH_DEPLOY_KEY: ${{ env.FASTLANE_MATCH_DEPLOY_KEY }}
-      - name: Setup Xcode 16.0
+      - name: Setup Xcode 16.1
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.0'
+          xcode-version: '16.1'
       
       - name: Setup Xcode First Launch
         run: |
@@ -810,7 +810,7 @@ jobs:
             - **Commit**: ${{ github.sha }}
             - **Branch**: ${{ github.ref_name }}
             - **Build Number**: ${{ github.run_number }}
-            - **Xcode**: 16.0 with iOS 18.0 SDK
+            - **Xcode**: 16.1 (auto-detected SDK)
             - **Note**: Android build temporarily disabled for iOS isolation testing
             ### 🚀 Next Steps
             - Download and test the iOS build
