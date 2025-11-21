@@ -144,13 +144,30 @@ platform :ios do
       )
     end
 
-    # Build and export iOS app using gym
-    UI.message "🔨 Building and exporting iOS app..."
+    # Build archive manually to avoid destination issues
+    UI.message "🔨 Building iOS archive..."
     
+    archive_path = File.expand_path("../ios/build/smbmobile.xcarchive")
+    
+    sh(
+      "xcodebuild archive " \
+      "-workspace ios/smbmobile.xcworkspace " \
+      "-scheme smbmobile " \
+      "-configuration Release " \
+      "-sdk iphoneos " \
+      "-archivePath '#{archive_path}' " \
+      "ONLY_ACTIVE_ARCH=NO " \
+      "ENABLE_BITCODE=NO " \
+      "COMPILER_INDEX_STORE_ENABLE=NO " \
+      "-allowProvisioningUpdates"
+    )
+    
+    UI.message "🔨 Exporting IPA from archive..."
+    
+    # Export the archive to IPA
     build_ios_app(
-      workspace: "ios/smbmobile.xcworkspace",
-      scheme: "smbmobile",
-      configuration: "Release",
+      skip_build_archive: true,
+      archive_path: archive_path,
       export_method: "app-store",
       output_directory: "./ios/build",
       output_name: "smbmobile.ipa",
@@ -160,8 +177,7 @@ platform :ios do
           "com.insighture.smbmobile" => "match AppStore com.insighture.smbmobile"
         },
         teamID: "96W7U4JYV4"
-      },
-      xcargs: "ONLY_ACTIVE_ARCH=NO ENABLE_BITCODE=NO COMPILER_INDEX_STORE_ENABLE=NO"
+      }
     )
     
     UI.success "✅ iOS app built and exported successfully!"
