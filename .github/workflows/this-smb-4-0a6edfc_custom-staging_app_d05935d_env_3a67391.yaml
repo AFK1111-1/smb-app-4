@@ -660,7 +660,7 @@ jobs:
         with:
           xcode-version: '16.1'
       
-      - name: Setup Xcode First Launch
+      - name: Setup Xcode First Launch and Install iOS 18.1 Runtime
         run: |
           echo "🔧 Running Xcode first launch setup..."
           sudo xcodebuild -runFirstLaunch
@@ -670,7 +670,19 @@ jobs:
           sudo xcodebuild -license accept || echo "License already accepted"
           
           echo ""
-          echo "📋 Available simulator runtimes:"
+          echo "📋 Available simulator runtimes BEFORE install:"
+          xcrun simctl list runtimes | grep iOS || echo "No iOS runtimes found"
+          
+          echo ""
+          echo "📥 Installing iOS 18.1 simulator runtime..."
+          sudo xcodebuild -downloadPlatform iOS || echo "Platform download failed or already exists"
+          
+          echo ""
+          echo "⏳ Waiting for runtime installation to complete..."
+          sleep 10
+          
+          echo ""
+          echo "📋 Available simulator runtimes AFTER install:"
           xcrun simctl list runtimes | grep iOS || echo "No iOS runtimes found"
       
       - name: Verify Xcode Setup
