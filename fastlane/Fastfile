@@ -151,7 +151,6 @@ platform :ios do
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
       configuration: "Release",
-      sdk: "iphoneos",
       export_method: "app-store",
       output_directory: "./ios/build",
       output_name: "smbmobile.ipa",

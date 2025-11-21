@@ -810,7 +810,7 @@ jobs:
             - **Commit**: ${{ github.sha }}
             - **Branch**: ${{ github.ref_name }}
             - **Build Number**: ${{ github.run_number }}
-            - **Xcode**: 16.0 with iOS 18.0 SDK
+            - **Xcode**: 16.1
             - **Note**: Android build temporarily disabled for iOS isolation testing
             ### 🚀 Next Steps
             - Download and test the iOS build
