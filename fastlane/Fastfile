@@ -160,12 +160,14 @@ platform :ios do
       )
       UI.message "📊 Latest TestFlight build number: #{latest_build}"
       
-      # Set build number to latest + 1
+      # Set build number to latest + 1 (proper sequential numbering)
+      # The retry logic below will handle any duplicate conflicts automatically
+      new_build_number = latest_build + 1
       increment_build_number(
         xcodeproj: "ios/smbmobile.xcodeproj",
-        build_number: latest_build + 1
+        build_number: new_build_number
       )
-      UI.success "✅ Build number set to: #{latest_build + 1}"
+      UI.success "✅ Build number set to: #{new_build_number}"
     rescue => ex
       UI.important "⚠️  Could not fetch latest TestFlight build number: #{ex.message}"
       UI.message "Using increment from Xcode project instead"
@@ -200,9 +202,67 @@ platform :ios do
    
     UI.success "✅ iOS app built and exported successfully!"
 
-    upload_to_testflight(
-      skip_waiting_for_build_processing: true
-    )
+    # Upload to TestFlight with retry logic for duplicate build numbers
+    max_retries = 3
+    retry_count = 0
+    upload_success = false
+    
+    while retry_count < max_retries && !upload_success
+      begin
+        upload_to_testflight(
+          skip_waiting_for_build_processing: true,
+          api_key: api_key
+        )
+        upload_success = true
+        UI.success "✅ Successfully uploaded to TestFlight!"
+      rescue => ex
+        if ex.message.include?("bundle version must be higher") || ex.message.include?("DUPLICATE")
+          retry_count += 1
+          UI.important "⚠️  Build number conflict detected (attempt #{retry_count}/#{max_retries})"
+          
+          if retry_count < max_retries
+            # Get current build number and increment
+            current_build = get_build_number(xcodeproj: "ios/smbmobile.xcodeproj")
+            new_build = current_build.to_i + 1
+            
+            UI.message "🔄 Incrementing build number from #{current_build} to #{new_build} and rebuilding..."
+            
+            # Increment build number
+            increment_build_number(
+              xcodeproj: "ios/smbmobile.xcodeproj",
+              build_number: new_build
+            )
+            
+            # Rebuild the app with new build number
+            build_ios_app(
+              workspace: "ios/smbmobile.xcworkspace",
+              scheme: "smbmobile",
+              configuration: "Release",
+              export_method: "app-store",
+              output_directory: "./ios/build",
+              output_name: "smbmobile.ipa",
+              export_options: {
+                method: "app-store",
+                provisioningProfiles: {
+                  "com.insighture.smbmobile" => "match AppStore com.insighture.smbmobile"
+                },
+                teamID: "96W7U4JYV4"
+              },
+              xcargs: "ONLY_ACTIVE_ARCH=NO ENABLE_BITCODE=NO COMPILER_INDEX_STORE_ENABLE=NO",
+              skip_profile_detection: true
+            )
+            
+            UI.success "✅ Rebuilt with build number #{new_build}"
+          else
+            UI.error "❌ Failed after #{max_retries} attempts"
+            raise ex
+          end
+        else
+          # Different error, don't retry
+          raise ex
+        end
+      end
+    end
 
     changelog_from_git_commits
   end
