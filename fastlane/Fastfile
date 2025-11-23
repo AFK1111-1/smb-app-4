@@ -86,45 +86,15 @@ platform :ios do
   end
 
   desc "Submit a new QA build to TestFlight"
- 
   lane :qa_release do
-    # Debug: Log environment variables and file
-    UI.important "=== Fastlane Environment Debug ==="
-    UI.message "APP_STORE_CONNECT_API_KEY_ID: #{ENV['APP_STORE_CONNECT_API_KEY_ID'] ? '✅ SET' : '❌ NOT SET'}"
-    UI.message "APP_STORE_CONNECT_ISSUER_ID: #{ENV['APP_STORE_CONNECT_ISSUER_ID'] ? '✅ SET' : '❌ NOT SET'}"
-    UI.message "MATCH_PASSWORD: #{ENV['MATCH_PASSWORD'] ? '✅ SET' : '❌ NOT SET'}"
-    if ENV['MATCH_PASSWORD']
-      UI.message "MATCH_PASSWORD length: #{ENV['MATCH_PASSWORD'].length} characters"
-      UI.message "MATCH_PASSWORD value: '#{ENV['MATCH_PASSWORD']}'"
-    end
-    
-    key_path = "credentials/ios/AuthKey.p8"
-    UI.message "Key file path: #{key_path}"
-    
-    if File.exist?(key_path)
-      file_size = File.size(key_path)
-      UI.message "Key file exists: ✅ YES (#{file_size} bytes)"
-      
-      # Check for null bytes
-      content = File.read(key_path)
-      if content.include?("\x00")
-        UI.error "❌ ERROR: File contains null bytes!"
-        UI.error "First 100 chars: #{content[0..100].inspect}"
-      else
-        UI.success "✅ No null bytes detected"
-        UI.message "File starts with: #{content[0..50]}"
-      end
-    else
-      UI.error "Key file exists: ❌ NO"
-    end
-    UI.important "==================================="
-
+    # Setup App Store Connect API authentication
     api_key = app_store_connect_api_key(
       key_id: ENV['APP_STORE_CONNECT_API_KEY_ID'],
       issuer_id: ENV['APP_STORE_CONNECT_ISSUER_ID'],
       key_filepath: "#{Dir.pwd}/../credentials/ios/AuthKey.p8"
     )
 
+    # Fetch App Store provisioning profiles and certificates from private Git repo
     match(
       type: "appstore",
       readonly: false,
@@ -136,7 +106,6 @@ platform :ios do
       keychain_name: ENV['KEYCHAIN_NAME']
     )
     
-    # Update Xcode project with team ID and provisioning profile
     update_code_signing_settings(
       use_automatic_signing: false,
       path: "ios/smbmobile.xcodeproj",
@@ -146,22 +115,18 @@ platform :ios do
       targets: ["smbmobile"]
     )
 
-    # ✅ Fix for versioning
+    # Increment version number
     increment_version_number(
       xcodeproj: "ios/smbmobile.xcodeproj",
       bump_type: "patch"
     )
     
-    # Get the latest build number from TestFlight and increment from there
+    # Get latest TestFlight build and increment
     begin
       latest_build = latest_testflight_build_number(
         app_identifier: "com.insighture.smbmobile",
         api_key: api_key
       )
-      UI.message "📊 Latest TestFlight build number: #{latest_build}"
-      
-      # Set build number to latest + 1 (proper sequential numbering)
-      # The retry logic below will handle any duplicate conflicts automatically
       new_build_number = latest_build + 1
       increment_build_number(
         xcodeproj: "ios/smbmobile.xcodeproj",
@@ -169,19 +134,11 @@ platform :ios do
       )
       UI.success "✅ Build number set to: #{new_build_number}"
     rescue => ex
-      UI.important "⚠️  Could not fetch latest TestFlight build number: #{ex.message}"
-      UI.message "Using increment from Xcode project instead"
-      increment_build_number(
-        xcodeproj: "ios/smbmobile.xcodeproj"
-      )
+      UI.important "⚠️  Could not fetch TestFlight build number, using local increment"
+      increment_build_number(xcodeproj: "ios/smbmobile.xcodeproj")
     end
 
-    UI.message "🔨 Building and archiving iOS app..."
-    UI.message "Using Xcode 16.1 - letting gym auto-detect best build strategy"
-    UI.message ""
-   
-    # Let gym handle both archiving AND exporting in one step
-    # This avoids manual destination issues
+    # Build and archive
     build_ios_app(
       workspace: "ios/smbmobile.xcworkspace",
       scheme: "smbmobile",
@@ -199,10 +156,9 @@ platform :ios do
       xcargs: "ONLY_ACTIVE_ARCH=NO ENABLE_BITCODE=NO COMPILER_INDEX_STORE_ENABLE=NO",
       skip_profile_detection: true
     )
-   
-    UI.success "✅ iOS app built and exported successfully!"
+    UI.success "✅ iOS app built successfully!"
 
-    # Upload to TestFlight with retry logic for duplicate build numbers
+    # Upload to TestFlight with auto-retry on duplicate build errors
     max_retries = 3
     retry_count = 0
     upload_success = false
@@ -221,19 +177,15 @@ platform :ios do
           UI.important "⚠️  Build number conflict detected (attempt #{retry_count}/#{max_retries})"
           
           if retry_count < max_retries
-            # Get current build number and increment
             current_build = get_build_number(xcodeproj: "ios/smbmobile.xcodeproj")
             new_build = current_build.to_i + 1
+            UI.message "🔄 Incrementing to build #{new_build} and rebuilding..."
             
-            UI.message "🔄 Incrementing build number from #{current_build} to #{new_build} and rebuilding..."
-            
-            # Increment build number
             increment_build_number(
               xcodeproj: "ios/smbmobile.xcodeproj",
               build_number: new_build
             )
             
-            # Rebuild the app with new build number
             build_ios_app(
               workspace: "ios/smbmobile.xcworkspace",
               scheme: "smbmobile",
@@ -251,14 +203,11 @@ platform :ios do
               xcargs: "ONLY_ACTIVE_ARCH=NO ENABLE_BITCODE=NO COMPILER_INDEX_STORE_ENABLE=NO",
               skip_profile_detection: true
             )
-            
-            UI.success "✅ Rebuilt with build number #{new_build}"
           else
             UI.error "❌ Failed after #{max_retries} attempts"
             raise ex
           end
         else
-          # Different error, don't retry
           raise ex
         end
       end
