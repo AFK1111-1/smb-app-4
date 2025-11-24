@@ -558,13 +558,10 @@ jobs:
         with:
           xcode-version: '16.1'
 
-      - name: Setup Xcode and iOS Runtime
+      - name: Setup Xcode
         run: |
           sudo xcodebuild -runFirstLaunch
-          sudo xcodebuild -license accept || echo "License already accepted"
-          sudo xcodebuild -downloadPlatform iOS &
-          wait $! || true
-          sleep 30
+          sudo xcodebuild -license accept 2>/dev/null || true
 
       - name: Create temporary keychain
         run: |
