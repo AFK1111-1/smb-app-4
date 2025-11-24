@@ -143,7 +143,6 @@ platform :ios do
       export_method: "app-store",
       output_directory: "./ios/build",
       output_name: "smbmobile.ipa",
-      sdk: "iphoneos",
       export_options: {
         method: "app-store",
         provisioningProfiles: {
