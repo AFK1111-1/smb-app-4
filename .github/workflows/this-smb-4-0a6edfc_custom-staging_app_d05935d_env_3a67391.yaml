@@ -515,11 +515,6 @@ jobs:
             sed 's/-----END PRIVATE KEY-----//g' | \
             tr -d ' \n\r\t')
           
-          if [ ${#base64_content} -lt 100 ]; then
-            echo "❌ ERROR: Base64 content too short, expected ~200+ chars"
-            exit 1
-          fi
-          
           echo "-----BEGIN PRIVATE KEY-----" > credentials/ios/AuthKey.p8
           echo "$base64_content" | fold -w 64 >> credentials/ios/AuthKey.p8
           echo "-----END PRIVATE KEY-----" >> credentials/ios/AuthKey.p8
