@@ -114,31 +114,17 @@ jobs:
         with:
           xcode-version: '16.1'
 
-      - name: Setup Xcode and Install iOS Runtime
+      - name: Setup Xcode First Launch and Install iOS 18.1 Runtime
         run: |
           sudo xcodebuild -runFirstLaunch
-          sudo xcodebuild -license accept 2>/dev/null || true
-          
-          echo "Starting iOS 18.1 runtime download (this may take 10-15 minutes)..."
-          sudo xcodebuild -downloadPlatform iOS > /tmp/xcode-download.log 2>&1 &
+          sudo xcodebuild -license accept || echo "License already accepted"
+          xcrun simctl list runtimes | grep iOS || echo "No iOS runtimes found"
+          sudo xcodebuild -downloadPlatform iOS &
           DOWNLOAD_PID=$!
+          wait $DOWNLOAD_PID || echo "Download process finished"
+          sleep 30
+          xcrun simctl list runtimes | grep iOS || echo "No iOS runtimes found"
           
-          echo "Waiting for download to complete (max 15 minutes)..."
-          for i in {1..90}; do
-            if ! kill -0 $DOWNLOAD_PID 2>/dev/null; then
-              echo "Download process completed"
-              break
-            fi
-            if [ $((i % 6)) -eq 0 ]; then
-              echo "Still downloading... ($((i * 10)) seconds elapsed)"
-            fi
-            sleep 10
-          done
-          
-          wait $DOWNLOAD_PID || echo "Download process finished with status: $?"
-          
-          echo "Verifying iOS SDK installation..."
-          xcodebuild -showsdks | grep -i ios
 
       - name: Create temporary keychain
         run: |
