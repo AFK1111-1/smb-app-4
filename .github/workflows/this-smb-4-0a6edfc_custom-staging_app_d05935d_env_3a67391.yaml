@@ -476,6 +476,13 @@ jobs:
         run: |
           gem install fastlane
           bundle install
+      - name: Setup environment variables
+        run: |
+          echo "KINDE_DOMAIN=${{ vars.KINDE_DOMAIN }}" >> .env
+          echo "KINDE_CLIENT_ID=${{ vars.KINDE_CLIENT_ID }}" >> .env
+          echo "KINDE_SCOPES=${{ vars.KINDE_SCOPES }}" >> .env
+          echo "PUBLIC_API_URL=${{ vars.PUBLIC_API_URL }}" >> .env
+          echo "KINDE_AUDIENCE=${{ vars.KINDE_AUDIENCE }}" >> .env
       - name: Create credentials directories
         run: |
           mkdir -p credentials/android
