@@ -101,31 +101,14 @@ jobs:
           pod install
           cd ..
 
-      - name: Setup SSH for Fastlane Match
+      - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          
-          if [ -z "$FASTLANE_MATCH_DEPLOY_KEY" ]; then
-            echo "❌ ERROR: FASTLANE_MATCH_DEPLOY_KEY is not set!"
-            exit 1
-          fi
-          
-          if echo "$FASTLANE_MATCH_DEPLOY_KEY" | grep -qE "^ssh-(rsa|ed25519|ecdsa)"; then
-            echo "❌ ERROR: FASTLANE_MATCH_DEPLOY_KEY contains a PUBLIC key, need PRIVATE key!"
-            exit 1
-          fi
-          
-          if echo "$FASTLANE_MATCH_DEPLOY_KEY" | head -c 5 | grep -q "^-----"; then
-            echo "$FASTLANE_MATCH_DEPLOY_KEY" > ~/.ssh/id_rsa
-          else
-            echo "$FASTLANE_MATCH_DEPLOY_KEY" | base64 --decode > ~/.ssh/id_rsa
-          fi
-          
+          echo "${{ env.FASTLANE_MATCH_DEPLOY_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
         env:
-          FASTLANE_MATCH_DEPLOY_KEY: ${{ secrets.FASTLANE_MATCH_DEPLOY_KEY }}
-
+          FASTLANE_MATCH_DEPLOY_KEY: ${{ env.FASTLANE_MATCH_DEPLOY_KEY }}
       - name: Setup Xcode 16.1
         uses: maxim-lobanov/setup-xcode@v1
         with:

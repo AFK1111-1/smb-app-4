@@ -481,32 +481,32 @@ jobs:
           mkdir -p credentials/android
           mkdir -p credentials/ios
 
-      - name: Setup Android Keystore
-        run: >
-          echo "${{ env.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode >
-          credentials/android/release.keystore
+      # - name: Setup Android Keystore
+      #   run: >
+      #     echo "${{ env.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode >
+      #     credentials/android/release.keystore
 
-      - name: Setup Google Play Service Key
-        run: |
-          echo "$GOOGLE_PLAY_SERVICE_KEY" | base64 --decode > credentials/android/google-play-service-key.json
+      # - name: Setup Google Play Service Key
+      #   run: |
+      #     echo "$GOOGLE_PLAY_SERVICE_KEY" | base64 --decode > credentials/android/google-play-service-key.json
 
-      - name: Setup Google Services JSON for Android
-        run: >
-          echo "${{ env.ANDROID_GOOGLE_SERVICES_JSON }}" | base64 --decode >
-          google-services.json
+      # - name: Setup Google Services JSON for Android
+      #   run: >
+      #     echo "${{ env.ANDROID_GOOGLE_SERVICES_JSON }}" | base64 --decode >
+      #     google-services.json
 
-      - name: Expo Prebuild for Android
-        run: npm run prebuild -- --platform android --clean
+      # - name: Expo Prebuild for Android
+      #   run: npm run prebuild -- --platform android --clean
 
-      - name: Build and Release Android
-        run: fastlane android qa_release
+      # - name: Build and Release Android
+      #   run: fastlane android qa_release
 
-      - name: Upload Android Release AAB
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-release-aab
-          path: android/app/build/outputs/bundle/release/app-release.aab
-          retention-days: '30'
+      # - name: Upload Android Release AAB
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: android-release-aab
+      #     path: android/app/build/outputs/bundle/release/app-release.aab
+      #     retention-days: '30'
 
       - name: Setup Apple API Key
         run: |
@@ -539,26 +539,10 @@ jobs:
           pod install
           cd ..
 
-      - name: Setup SSH for Fastlane Match
+      - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          
-          if [ -z "$FASTLANE_MATCH_DEPLOY_KEY" ]; then
-            echo "❌ ERROR: FASTLANE_MATCH_DEPLOY_KEY is not set!"
-            exit 1
-          fi
-          
-          if echo "$FASTLANE_MATCH_DEPLOY_KEY" | grep -qE "^ssh-(rsa|ed25519|ecdsa)"; then
-            echo "❌ ERROR: FASTLANE_MATCH_DEPLOY_KEY contains a PUBLIC key, need PRIVATE key!"
-            exit 1
-          fi
-          
-          if echo "$FASTLANE_MATCH_DEPLOY_KEY" | head -c 5 | grep -q "^-----"; then
-            echo "$FASTLANE_MATCH_DEPLOY_KEY" > ~/.ssh/id_rsa
-          else
-            echo "$FASTLANE_MATCH_DEPLOY_KEY" | base64 --decode > ~/.ssh/id_rsa
-          fi
-          
+          echo "${{ env.FASTLANE_MATCH_DEPLOY_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
         env:
@@ -626,7 +610,6 @@ jobs:
           body: |
             ## QA Release v${{ github.run_number }}
             ### 📱 Build Artifacts
-            - **🤖 Android AAB**: Download from Actions tab
             - **🍎 iOS IPA**: Download from Actions tab
             ### 📋 Build Details
             - **Commit**: ${{ github.sha }}
@@ -634,7 +617,6 @@ jobs:
             - **Build Number**: ${{ github.run_number }}
             - **Xcode**: 16.1 with iOS 18.1 runtime
             ### 🚀 Deployment
-            - Android: Internal track on Google Play
             - iOS: TestFlight
           draft: false
           tag_name: qa-v${{ github.run_number }}
