@@ -5,7 +5,7 @@ on:
 
 jobs:
   qa-build:
-    runs-on: macos-latest # should use macos-latest when ios builds enabled
+    runs-on: macos-15
     name: Build QA Release
 
     steps:
@@ -45,62 +45,136 @@ jobs:
           mkdir -p credentials/android
           mkdir -p credentials/ios
 
-      - name: Setup Android Keystore from secrets
-        run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > credentials/android/release.keystore
+      - name: Setup Android Keystore
+        run: >
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode >
+          credentials/android/release.keystore
 
-      - name: Setup Google Play Service Key from secrets
+      - name: Setup Google Play Service Key
         run: |
-          echo '${{ secrets.GOOGLE_PLAY_SERVICE_KEY }}' > credentials/android/google-play-service-key.json
-
-      - name: Setup Apple API Key for Fastlane Match
-        run: |
-          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | base64 --decode > credentials/ios/AuthKey.p8
+          echo "${{ secrets.GOOGLE_PLAY_SERVICE_KEY }}" | base64 --decode > credentials/android/google-play-service-key.json
 
       - name: Setup Google Services JSON for Android
-        run: |
-          echo "${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}" | base64 --decode > google-services.json
+        run: >
+          echo "${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}" | base64 --decode >
+          google-services.json
 
-      - name: Setup Google Service Info Plist for iOS
-        run: |
-          echo "${{ secrets.IOS_GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode > GoogleService-Info.plist
+      - name: Expo Prebuild for Android
+        run: npm run prebuild -- --platform android --clean
 
-      - name: Expo Prebuild
-        run: npm run prebuild --clean
-
-      - name: Build and Release Android QA
+      - name: Build and Release Android
         run: fastlane android qa_release
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
-      - name: Setup SSH
+      - name: Setup Apple API Key
+        run: |
+          base64_content=$(echo "$APP_STORE_CONNECT_API_KEY_BASE64" | \
+            sed 's/-----BEGIN PRIVATE KEY-----//g' | \
+            sed 's/-----END PRIVATE KEY-----//g' | \
+            tr -d ' \n\r\t')
+          
+          if [ ${#base64_content} -lt 100 ]; then
+            echo "❌ ERROR: Base64 content too short, expected ~200+ chars"
+            exit 1
+          fi
+          
+          echo "-----BEGIN PRIVATE KEY-----" > credentials/ios/AuthKey.p8
+          echo "$base64_content" | fold -w 64 >> credentials/ios/AuthKey.p8
+          echo "-----END PRIVATE KEY-----" >> credentials/ios/AuthKey.p8
+        env:
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+
+      - name: Setup Google Service Info Plist for iOS
+        run: >
+          echo "${{ secrets.IOS_GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode >
+          GoogleService-Info.plist
+
+      - name: Expo Prebuild for iOS
+        run: npm run prebuild -- --platform ios --clean
+
+      - name: Install CocoaPods dependencies
+        run: |
+          cd ios
+          pod install
+          cd ..
+
+      - name: Setup SSH for Fastlane Match
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.FASTLANE_MATCH_DEPLOY_KEY }}" > ~/.ssh/id_rsa
+          
+          if [ -z "$FASTLANE_MATCH_DEPLOY_KEY" ]; then
+            echo "❌ ERROR: FASTLANE_MATCH_DEPLOY_KEY is not set!"
+            exit 1
+          fi
+          
+          if echo "$FASTLANE_MATCH_DEPLOY_KEY" | grep -qE "^ssh-(rsa|ed25519|ecdsa)"; then
+            echo "❌ ERROR: FASTLANE_MATCH_DEPLOY_KEY contains a PUBLIC key, need PRIVATE key!"
+            exit 1
+          fi
+          
+          if echo "$FASTLANE_MATCH_DEPLOY_KEY" | head -c 5 | grep -q "^-----"; then
+            echo "$FASTLANE_MATCH_DEPLOY_KEY" > ~/.ssh/id_rsa
+          else
+            echo "$FASTLANE_MATCH_DEPLOY_KEY" | base64 --decode > ~/.ssh/id_rsa
+          fi
+          
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
+        env:
+          FASTLANE_MATCH_DEPLOY_KEY: ${{ secrets.FASTLANE_MATCH_DEPLOY_KEY }}
 
-      - name: Select Xcode 16.2
+      - name: Setup Xcode 16.1
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.1'
+
+      - name: Setup Xcode and iOS Runtime
         run: |
-          echo "Available Xcode versions:"
-          ls -la /Applications/ | grep Xcode
+          sudo xcodebuild -runFirstLaunch
+          sudo xcodebuild -license accept || echo "License already accepted"
+          sudo xcodebuild -downloadPlatform iOS &
+          wait $! || true
+          sleep 30
 
-          # ✅ Select the same version you use locally
-          sudo xcode-select -s /Applications/Xcode_16.1.app
+      - name: Create temporary keychain
+        run: |
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+          KEYCHAIN_NAME="build.keychain"
+          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> $GITHUB_ENV
+          echo "KEYCHAIN_NAME=$KEYCHAIN_NAME" >> $GITHUB_ENV
+          
+          security delete-keychain "$KEYCHAIN_NAME" 2>/dev/null || true
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          
+          EXISTING_KEYCHAINS=$(security list-keychains -d user | tr -d '"' | tr '\n' ' ')
+          security list-keychains -d user -s "$KEYCHAIN_NAME" $EXISTING_KEYCHAINS
+          security default-keychain -s "$KEYCHAIN_NAME"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          security set-keychain-settings -t 3600 -u "$KEYCHAIN_NAME"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME" 2>/dev/null || true
 
-          echo "Selected Xcode path:"
-          xcode-select -p
-          echo "Xcode version details:"
-          xcodebuild -version
+      - name: Unlock keychain
+        run: |
+          security unlock-keychain -p "${{ env.KEYCHAIN_PASSWORD }}" "${{ env.KEYCHAIN_NAME }}"
 
-      - name: Build and Release iOS QA
+      - name: Build and Release iOS
         run: fastlane ios qa_release
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ env.KEYCHAIN_PASSWORD }}
+          KEYCHAIN_NAME: ${{ env.KEYCHAIN_NAME }}
+          FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: 60
+          FASTLANE_XCODEBUILD_SETTINGS_RETRIES: 6
+
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          security delete-keychain "${{ env.KEYCHAIN_NAME }}" 2>/dev/null || true
 
       - name: Upload Android Release AAB
         uses: actions/upload-artifact@v4
@@ -117,26 +191,23 @@ jobs:
           retention-days: 30
 
       - name: Create GitHub Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
-          tag_name: qa-v${{ github.run_number }}
-          release_name: QA Release v${{ github.run_number }}
           body: |
             ## QA Release v${{ github.run_number }}
-
             ### 📱 Build Artifacts
             - **🤖 Android AAB**: Download from Actions tab
             - **🍎 iOS IPA**: Download from Actions tab
-
             ### 📋 Build Details
             - **Commit**: ${{ github.sha }}
             - **Branch**: ${{ github.ref_name }}
             - **Build Number**: ${{ github.run_number }}
-
-            ### 🚀 Next Steps
-            - Download and test the builds
-            - Promote to staging when ready
+            - **Xcode**: 16.1 with iOS 18.1 runtime
+            ### 🚀 Deployment
+            - Android: Internal track on Google Play
+            - iOS: TestFlight
           draft: false
+          tag_name: qa-v${{ github.run_number }}
           prerelease: true
+          name: QA Release v${{ github.run_number }}
+          token: ${{ secrets.GITHUB_TOKEN }}
