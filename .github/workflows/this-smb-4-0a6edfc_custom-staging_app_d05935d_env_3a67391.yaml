@@ -548,6 +548,34 @@ jobs:
         run: >
           echo "$GOOGLE_PLAY_SERVICE_KEY" | base64 --decode >
           credentials/android/google-play-service-key.json
+      - name: Debug Google Play Service Key
+        run: |
+          echo "Checking Google Play Service Key file..."
+          if [ -f "credentials/android/google-play-service-key.json" ]; then
+            echo "✓ File exists"
+            FILE_SIZE=$(wc -c < credentials/android/google-play-service-key.json)
+            echo "File size: $FILE_SIZE bytes"
+            if [ $FILE_SIZE -eq 0 ]; then
+              echo "✗ ERROR: File is empty!"
+              echo "GOOGLE_PLAY_SERVICE_KEY variable might be empty or not set"
+              exit 1
+            fi
+            echo "First 100 characters of file (masked):"
+            head -c 100 credentials/android/google-play-service-key.json | sed 's/./*/g'
+            echo ""
+            echo "Validating JSON structure..."
+            if jq empty credentials/android/google-play-service-key.json 2>/dev/null; then
+              echo "✓ Valid JSON file"
+            else
+              echo "✗ ERROR: Invalid JSON file"
+              echo "Showing file structure (with sensitive data masked):"
+              cat credentials/android/google-play-service-key.json | jq -r 'keys' 2>&1 || echo "Cannot parse JSON keys"
+              exit 1
+            fi
+          else
+            echo "✗ ERROR: File does not exist!"
+            exit 1
+          fi
       - name: Setup Google Services JSON for Android
         run: >
           echo "${{ env.ANDROID_GOOGLE_SERVICES_JSON }}" | base64 --decode >
