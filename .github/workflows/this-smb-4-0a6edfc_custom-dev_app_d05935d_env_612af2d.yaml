@@ -544,6 +544,9 @@ jobs:
           echo "${{ env.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode >
           credentials/android/release.keystore
       - name: Setup Google Play Service Key
+        run: >
+          echo "$GOOGLE_PLAY_SERVICE_KEY" | base64 --decode >
+          credentials/android/google-play-service-key.json
       - name: Setup Google Services JSON for Android
         run: >
           echo "${{ env.ANDROID_GOOGLE_SERVICES_JSON }}" | base64 --decode >
@@ -613,6 +616,33 @@ jobs:
           sleep 30
           xcrun simctl list runtimes | grep iOS || echo "No iOS runtimes found"
       - name: Create temporary keychain
+        run: >
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          KEYCHAIN_NAME="build.keychain"
+
+          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> $GITHUB_ENV
+
+          echo "KEYCHAIN_NAME=$KEYCHAIN_NAME" >> $GITHUB_ENV
+
+          security delete-keychain "$KEYCHAIN_NAME" 2>/dev/null || true
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+
+          EXISTING_KEYCHAINS=$(security list-keychains -d user | tr -d '"' | tr
+          '\n' ' ')
+
+          security list-keychains -d user -s "$KEYCHAIN_NAME"
+          $EXISTING_KEYCHAINS
+
+          security default-keychain -s "$KEYCHAIN_NAME"
+
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+
+          security set-keychain-settings -t 3600 -u "$KEYCHAIN_NAME"
+
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k
+          "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME" 2>/dev/null || true
       - name: Unlock keychain
         run: >-
           security unlock-keychain -p "${{ env.KEYCHAIN_PASSWORD }}" "${{
