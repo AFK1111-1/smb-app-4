@@ -80,12 +80,71 @@ jobs:
       - name: 'Run :: Evaluate Trivy Results'
         run: |2-
              
-                  if jq -e '.Results | map(select(.Vulnerabilities)) | length > 0' trivy_results.min.json >/dev/null; then
-                    echo "Vulnerabilities detected!"
-                    jq '.Results[] | select(.Vulnerabilities?) | {Target: .Target, Vulnerabilities: .Vulnerabilities[] | {ID: .VulnerabilityID, Severity: .Severity, Description: .Description}}' trivy_results.min.json
-                    echo "IS_TRIVY_VULNERABILITIES_DETECTED=true" >> $GITHUB_ENV
+                  SEVERITY="NONE"
+
+                  echo "Evaluating Trivy results. Selected severity: '$SEVERITY'"
+
+                  if [ "$SEVERITY" = "NONE" ]; then
+                    echo "Severity is NONE. No vulnerabilities will be printed or evaluated."
+                    exit 0
                   fi
-                  
+
+                  if [ -z "$SEVERITY" ]; then
+                    echo "Severity empty. Printing ALL vulnerabilities."
+
+                    jq '
+                      .Results[]
+                      | select(.Vulnerabilities?)
+                      | {
+                          Target: .Target,
+                          Vulnerabilities: (
+                            .Vulnerabilities[]
+                            | {ID: .VulnerabilityID, Severity: .Severity, Description: .Description}
+                          )
+                        }
+                    ' trivy_results.min.json
+
+                    # If any vulnerabilities exist at all
+                    if jq -e '
+                      .Results
+                      | map(select(.Vulnerabilities))
+                      | length > 0
+                    ' trivy_results.min.json >/dev/null; then
+                      echo "IS_TRIVY_VULNERABILITIES_DETECTED=true" >> $GITHUB_ENV
+                    fi
+
+                    exit 0
+                  fi
+
+                  # First: check if any vulnerabilities match this severity
+                  if jq -e '
+                    .Results
+                    | map(select(.Vulnerabilities))
+                    | .[].Vulnerabilities
+                    | map(select(.Severity == "'"$SEVERITY"'"))
+                    | length > 0
+                  ' trivy_results.min.json >/dev/null; then
+
+                    echo "Vulnerabilities detected for severity: $SEVERITY"
+                    echo "IS_TRIVY_VULNERABILITIES_DETECTED=true" >> $GITHUB_ENV
+
+                    # Print ONLY matching severity (console only)
+                    jq '
+                      .Results[]
+                      | select(.Vulnerabilities?)
+                      | {
+                          Target: .Target,
+                          Vulnerabilities: (
+                            .Vulnerabilities[]
+                            | select(.Severity == "'"$SEVERITY"'")
+                            | {ID: .VulnerabilityID, Severity: .Severity, Description: .Description}
+                          )
+                        }
+                    ' trivy_results.min.json
+                  else
+                    echo "No vulnerabilities found for severity: $SEVERITY"
+                  fi
+                
       - name: 'Run :: Trivy Filesystem Scan (Including Trivy Ignores)'
         run: |2-
 
@@ -149,14 +208,23 @@ jobs:
                   fi
                   trivyVulnFound=${{ env.IS_TRIVY_VULNERABILITIES_DETECTED }}
                   if [ -n "$trivyVulnFound" ] && [ "NONE" != "NONE" ]; then
-                    echo "Trivy vulnerabilities were detected."
-                    echo "The job failed after uploading the code scan reports."
+                    echo "Trivy vulnerabilities were detected!"
                     exit 1
                   fi
                   
   _status-pending:
     name: _status-pending
     steps:
+      - name: 'Run :: Decoding Secrets'
+        run: |2-
+
+                if [ ! -x "$(command -v jq)" ]; then
+                  echo "jq not found, installing..."
+                  sudo apt-get update
+                  sudo apt-get install -y jq
+                fi
+                echo "${{ env.ENCODED_PIPELINE_SECRET }}" | base64 --decode | jq -r 'to_entries[] | "\(.key)=\(.value)"' | while read line; do echo "$line" >> $GITHUB_ENV; echo "::add-mask::${line#*=}"; done
+                
       - name: 'Run :: Start'
         run: |2-
 
@@ -195,16 +263,6 @@ jobs:
                 echo "Skipping checkout..."
               fi
             
-      - name: 'Run :: Decoding Secrets'
-        run: |2-
-
-                if [ ! -x "$(command -v jq)" ]; then
-                  echo "jq not found, installing..."
-                  sudo apt-get update
-                  sudo apt-get install -y jq
-                fi
-                echo "${{ env.ENCODED_PIPELINE_SECRET }}" | base64 --decode | jq -r 'to_entries[] | "\(.key)=\(.value)"' | while read line; do echo "$line" >> $GITHUB_ENV; echo "::add-mask::${line#*=}"; done
-                
       - name: 'Run :: Checkout repository'
         uses: actions/checkout@v4
         with:
@@ -230,6 +288,16 @@ jobs:
   _status_testing:
     name: _status_testing
     steps:
+      - name: 'Run :: Decoding Secrets'
+        run: |2-
+
+                if [ ! -x "$(command -v jq)" ]; then
+                  echo "jq not found, installing..."
+                  sudo apt-get update
+                  sudo apt-get install -y jq
+                fi
+                echo "${{ env.ENCODED_PIPELINE_SECRET }}" | base64 --decode | jq -r 'to_entries[] | "\(.key)=\(.value)"' | while read line; do echo "$line" >> $GITHUB_ENV; echo "::add-mask::${line#*=}"; done
+                
       - name: 'Run :: Start'
         run: |2-
 
@@ -268,16 +336,6 @@ jobs:
                 echo "Skipping checkout..."
               fi
             
-      - name: 'Run :: Decoding Secrets'
-        run: |2-
-
-                if [ ! -x "$(command -v jq)" ]; then
-                  echo "jq not found, installing..."
-                  sudo apt-get update
-                  sudo apt-get install -y jq
-                fi
-                echo "${{ env.ENCODED_PIPELINE_SECRET }}" | base64 --decode | jq -r 'to_entries[] | "\(.key)=\(.value)"' | while read line; do echo "$line" >> $GITHUB_ENV; echo "::add-mask::${line#*=}"; done
-                
       - name: 'Run :: Pipeline Testing'
         run: |2-
 
@@ -291,6 +349,16 @@ jobs:
   _release-info:
     name: _release-info
     steps:
+      - name: 'Run :: Decoding Secrets'
+        run: |2-
+
+                if [ ! -x "$(command -v jq)" ]; then
+                  echo "jq not found, installing..."
+                  sudo apt-get update
+                  sudo apt-get install -y jq
+                fi
+                echo "${{ env.ENCODED_PIPELINE_SECRET }}" | base64 --decode | jq -r 'to_entries[] | "\(.key)=\(.value)"' | while read line; do echo "$line" >> $GITHUB_ENV; echo "::add-mask::${line#*=}"; done
+                
       - name: 'Run :: Start'
         run: |2-
 
@@ -329,16 +397,6 @@ jobs:
                 echo "Skipping checkout..."
               fi
             
-      - name: 'Run :: Decoding Secrets'
-        run: |2-
-
-                if [ ! -x "$(command -v jq)" ]; then
-                  echo "jq not found, installing..."
-                  sudo apt-get update
-                  sudo apt-get install -y jq
-                fi
-                echo "${{ env.ENCODED_PIPELINE_SECRET }}" | base64 --decode | jq -r 'to_entries[] | "\(.key)=\(.value)"' | while read line; do echo "$line" >> $GITHUB_ENV; echo "::add-mask::${line#*=}"; done
-                
       - name: 'Run :: Pipeline Release'
         env:
           RELEASE_ID: ${{ github.event.client_payload.releaseData.releaseId }}
@@ -411,169 +469,143 @@ jobs:
   build-and-release:
     name: build-and-release
     steps:
-      - name: 'Run :: Start'
-        run: |2-
-
-              echo " Starting GitHub Action!" && 
-              echo "STEPS_CAN_PROCEED=true" >> $GITHUB_ENV
-              
-      - name: 'Run :: Checkout repository'
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: 'Run :: Checkout Specific Commit'
-        env:
-          COMMIT_ID: ${{ github.event.client_payload.commitId }}
-          BRANCH_NAME: ${{ github.event.client_payload.branchName }}
-        if: >-
-          ${{ github.event.client_payload.commitId != null ||
-          github.event.client_payload.branchName != null }}
-        run: |2-
-
-              echo "Starting the checkout process..."
-              git fetch --all
-              if [ -n "$COMMIT_ID" ]; then
-                echo "Commit ID provided: $COMMIT_ID"
-                git checkout $COMMIT_ID || true
-                echo "Checked out to commit ID: $COMMIT_ID"
-              elif [ -n "$BRANCH_NAME" ]; then
-                echo "Branch name provided: $BRANCH_NAME"
-                git checkout $BRANCH_NAME || true
-                echo "Checked out to branch: $BRANCH_NAME"
-
-                #Updating the commit Id
-                ACTUAL_COMMIT_ID=$(git rev-parse HEAD)
-                echo "Changing CommitId: $ACTUAL_COMMIT_ID"
-                echo "COMMIT_ID=$ACTUAL_COMMIT_ID" >> $GITHUB_ENV
-              else
-                echo "Skipping checkout..."
-              fi
-            
-      - name: 'Run :: Decoding Secrets'
-        run: |2-
-
-                if [ ! -x "$(command -v jq)" ]; then
-                  echo "jq not found, installing..."
-                  sudo apt-get update
-                  sudo apt-get install -y jq
-                fi
-                echo "${{ env.ENCODED_PIPELINE_SECRET }}" | base64 --decode | jq -r 'to_entries[] | "\(.key)=\(.value)"' | while read line; do echo "$line" >> $GITHUB_ENV; echo "::add-mask::${line#*=}"; done
-                
       - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          cache: npm
-          node-version: '18'
       - name: Install dependencies
         run: npm ci
       - name: Install Ruby and Fastlane
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.2'
-          bundler-cache: true
       - name: Install Fastlane
         run: |
           gem install fastlane
           bundle install
-      - name: Setup Kinde environment variables
+      - name: Setup environment variables
         run: |
-          echo "Set Kinde Variables"
+          echo "KINDE_DOMAIN=${{ vars.KINDE_DOMAIN }}" >> .env
+          echo "KINDE_CLIENT_ID=${{ vars.KINDE_CLIENT_ID }}" >> .env
+          echo "KINDE_SCOPES=${{ vars.KINDE_SCOPES }}" >> .env
+          echo "PUBLIC_API_URL=${{ vars.PUBLIC_API_URL }}" >> .env
+          echo "KINDE_AUDIENCE=${{ vars.KINDE_AUDIENCE }}" >> .env
       - name: Create credentials directories
         run: |
           mkdir -p credentials/android
           mkdir -p credentials/ios
-      - name: Setup Android Keystore from secrets
+      - name: Setup Android Keystore
         run: >
           echo "${{ env.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode >
           credentials/android/release.keystore
-      - name: Setup Google Play Service Key from secrets
+      - name: Setup Google Play Service Key
         run: >
-          echo '${{ env.GOOGLE_PLAY_SERVICE_KEY }}' >
+          echo "$GOOGLE_PLAY_SERVICE_KEY" | base64 --decode >
           credentials/android/google-play-service-key.json
-      - name: Setup Apple API Key for Fastlane Match
-        run: |
-          echo '${{ env.FASTLANE_PASSWORD }}' > credentials/ios/AuthKey.p8
       - name: Setup Google Services JSON for Android
         run: >
           echo "${{ env.ANDROID_GOOGLE_SERVICES_JSON }}" | base64 --decode >
           google-services.json
+      - name: Expo Prebuild for Android
+        run: npm run prebuild -- --platform android --clean
+      - name: Build and Release Android
+        run: fastlane android qa_release
+      - name: Upload Android Release AAB
+      - name: Setup Apple API Key
+        run: >
+          base64_content=$(echo "$APP_STORE_CONNECT_API_KEY_BASE64" | sed
+          's/-----BEGIN PRIVATE KEY-----//g' | sed 's/-----END PRIVATE
+          KEY-----//g' | tr -d ' \n\r\t')
+
+          echo "-----BEGIN PRIVATE KEY-----" > credentials/ios/AuthKey.p8
+
+          echo "$base64_content" | fold -w 64 >> credentials/ios/AuthKey.p8
+
+          echo "-----END PRIVATE KEY-----" >> credentials/ios/AuthKey.p8
       - name: Setup Google Service Info Plist for iOS
         run: >
           echo "${{ env.IOS_GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode >
           GoogleService-Info.plist
-      - name: Expo Prebuild
-        run: npm run prebuild --clean
-      - name: Build and Release Android
-        run: fastlane android release
-      - name: Setup SSH
+      - name: Expo Prebuild for iOS
+        run: npm run prebuild -- --platform ios --clean
+      - name: Install CocoaPods dependencies
         run: |
+          cd ios
+          pod install
+          cd ..
+      - name: Setup SSH for Fastlane Match
+        run: >
           mkdir -p ~/.ssh
-          echo "${{ env.FASTLANE_MATCH_DEPLOY_KEY }}" > ~/.ssh/id_rsa
+
+          if echo "$FASTLANE_MATCH_DEPLOY_KEY" | head -c 5 | grep -q "^-----";
+          then
+
+          echo "$FASTLANE_MATCH_DEPLOY_KEY" > ~/.ssh/id_rsa
+
+          else
+
+          echo "$FASTLANE_MATCH_DEPLOY_KEY" | base64 --decode > ~/.ssh/id_rsa
+
+          fi
+
           chmod 600 ~/.ssh/id_rsa
+
           ssh-keyscan github.com >> ~/.ssh/known_hosts
-      - name: Select Xcode 16.2
-        run: |
-          echo "Available Xcode versions:"
-          ls -la /Applications/ | grep Xcode
+      - name: Setup Xcode 16.1
+      - name: Setup Xcode First Launch and Install iOS 18.1 Runtime
+        run: |-
+          sudo xcodebuild -runFirstLaunch
+          sudo xcodebuild -license accept || echo "License already accepted"
+          xcrun simctl list runtimes | grep iOS || echo "No iOS runtimes found"
+          sudo xcodebuild -downloadPlatform iOS &
+          DOWNLOAD_PID=$!
+          wait $DOWNLOAD_PID || echo "Download process finished"
+          sleep 30
+          xcrun simctl list runtimes | grep iOS || echo "No iOS runtimes found"
+      - name: Create temporary keychain
+        run: >
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
 
-          # ✅ Select the same version you use locally
-          sudo xcode-select -s /Applications/Xcode_16.2.app
+          KEYCHAIN_NAME="build.keychain"
 
-          echo "Selected Xcode path:"
-          xcode-select -p
-          echo "Xcode version details:"
-          xcodebuild -version
-      - name: Verify iOS project structure
-        run: |
-          echo "iOS project structure:"
-          ls -la ios/
-          echo "Workspace contents:"
-          ls -la ios/smbmobile.xcworkspace/
-          echo "Xcode project contents:"
-          ls -la ios/smbmobile.xcodeproj/
+          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> $GITHUB_ENV
+
+          echo "KEYCHAIN_NAME=$KEYCHAIN_NAME" >> $GITHUB_ENV
+
+          security delete-keychain "$KEYCHAIN_NAME" 2>/dev/null || true
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+
+          EXISTING_KEYCHAINS=$(security list-keychains -d user | tr -d '"' | tr
+          '\n' ' ')
+
+          security list-keychains -d user -s "$KEYCHAIN_NAME"
+          $EXISTING_KEYCHAINS
+
+          security default-keychain -s "$KEYCHAIN_NAME"
+
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+
+          security set-keychain-settings -t 3600 -u "$KEYCHAIN_NAME"
+
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k
+          "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME" 2>/dev/null || true
+      - name: Unlock keychain
+        run: >-
+          security unlock-keychain -p "${{ env.KEYCHAIN_PASSWORD }}" "${{
+          env.KEYCHAIN_NAME }}"
       - name: Build and Release iOS
-        run: fastlane ios release
-      - name: Upload Android Release AAB
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-release-aab
-          path: android/app/build/outputs/bundle/release/app-release.aab
-          retention-days: '30'
+        run: fastlane ios qa_release
+      - name: Cleanup keychain
+        run: >
+          security delete-keychain "${{ env.KEYCHAIN_NAME }}" 2>/dev/null ||
+          true
       - name: Upload iOS Release IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-release-ipa
-          path: ios/build/smbmobile.ipa
-          retention-days: '30'
       - name: Create GitHub Release
-        uses: actions/create-release@v1
-        with:
-          body: |
-            ## QA Release v${{ github.run_number }}
+      - name: 'Run :: Decoding Secrets'
+        run: |2-
 
-            ### 📱 Build Artifacts
-            - **🤖 Android AAB**: Download from Actions tab
-            - **🍎 iOS IPA**: Download from Actions tab
-
-            ### 📋 Build Details
-            - **Commit**: ${{ github.sha }}
-            - **Branch**: ${{ github.ref_name }}
-            - **Build Number**: ${{ github.run_number }}
-
-            ### 🚀 Next Steps
-            - Download and test the builds
-            - Promote to staging when ready
-          draft: false
-          tag_name: qa-v${{ github.run_number }}
-          prerelease: true
-          release_name: QA Release v${{ github.run_number }}
-    needs:
-      - _status_testing
-    permissions: write-all
-    runs-on: macos-latest
-  _status-success:
-    name: _status-success
-    steps:
+                if [ ! -x "$(command -v jq)" ]; then
+                  echo "jq not found, installing..."
+                  sudo apt-get update
+                  sudo apt-get install -y jq
+                fi
+                echo "${{ env.ENCODED_PIPELINE_SECRET }}" | base64 --decode | jq -r 'to_entries[] | "\(.key)=\(.value)"' | while read line; do echo "$line" >> $GITHUB_ENV; echo "::add-mask::${line#*=}"; done
+                
       - name: 'Run :: Start'
         run: |2-
 
@@ -612,77 +644,23 @@ jobs:
                 echo "Skipping checkout..."
               fi
             
-      - name: 'Run :: Decoding Secrets'
-        run: |2-
-
-                if [ ! -x "$(command -v jq)" ]; then
-                  echo "jq not found, installing..."
-                  sudo apt-get update
-                  sudo apt-get install -y jq
-                fi
-                echo "${{ env.ENCODED_PIPELINE_SECRET }}" | base64 --decode | jq -r 'to_entries[] | "\(.key)=\(.value)"' | while read line; do echo "$line" >> $GITHUB_ENV; echo "::add-mask::${line#*=}"; done
-                
-      - name: 'Run :: Pipeline Success'
-        env:
-          RUN_ID: ${{ github.run_id }}
-        run: |2-
-
-              context=$(echo "$CONTEXT_JSON" | jq --arg sha "$COMMIT_ID" '.sha = $sha' | jq -c . | base64)
-              response=$(curl -X PUT -d "runId=$RUN_ID&context=$context&appId=${{ github.event.client_payload.externalRepo.appId }}"  -H 'Authorization: ${{ env.SERVICE_ACC_ACCESS_TOKEN }}' -H 'x-organization-id: ${{ env.PIPELINE_ORGANIZATION_ID }}' -H 'x-project-id: ${{ env.PIPELINE_PROJECT_ID }}' -H 'x-environment-id: ${{ env.PIPELINE_ENVIRONMENT_ID }}' -H 'x-trace-id: ${{ env.PIPELINE_TRACE_ID }}' -H 'x-auth-by: sa' -H 'Content-Type: application/x-www-form-urlencoded'  "${{ env.PIPELINE_SERVICE_EP }}/${{ env.PIPELINE_ID }}/SUCCESS?releaseId=${{ github.event.client_payload.releaseData.releaseId }}")
-              
     needs:
-      - code-scan
       - _status_testing
-      - build-and-release
-      - deploy
     permissions: write-all
-    if: ${{ !(failure() || cancelled()) }}
-    env:
-      CONTEXT_JSON: ${{ toJson(github) }}
-    runs-on: ubuntu-latest
-  _status-failed:
-    name: _status-failed
-    steps:
-      - name: 'Run :: Decoding Secrets'
-        run: |2-
-
-                if [ ! -x "$(command -v jq)" ]; then
-                  echo "jq not found, installing..."
-                  sudo apt-get update
-                  sudo apt-get install -y jq
-                fi
-                echo "${{ env.ENCODED_PIPELINE_SECRET }}" | base64 --decode | jq -r 'to_entries[] | "\(.key)=\(.value)"' | while read line; do echo "$line" >> $GITHUB_ENV; echo "::add-mask::${line#*=}"; done
-                
-      - name: 'Run :: Pipeline Failed'
-        env:
-          RUN_ID: ${{ github.run_id }}
-        run: |2-
-
-              context=$(echo "$CONTEXT_JSON" | jq --arg sha "$COMMIT_ID" '.sha = $sha' | jq -c . | base64)
-              response=$(curl -X PUT -d "runId=$RUN_ID&context=$context&appId=${{ github.event.client_payload.externalRepo.appId }}"  -H 'Authorization: ${{ env.SERVICE_ACC_ACCESS_TOKEN }}' -H 'x-organization-id: ${{ env.PIPELINE_ORGANIZATION_ID }}' -H 'x-project-id: ${{ env.PIPELINE_PROJECT_ID }}' -H 'x-environment-id: ${{ env.PIPELINE_ENVIRONMENT_ID }}' -H 'x-trace-id: ${{ env.PIPELINE_TRACE_ID }}' -H 'x-auth-by: sa' -H 'Content-Type: application/x-www-form-urlencoded'  "${{ env.PIPELINE_SERVICE_EP }}/${{ env.PIPELINE_ID }}/FAILED?releaseId=${{ github.event.client_payload.releaseData.releaseId }}")
-
-              # Triggering SkyU Alerts
-              response=$(curl -X POST -d "labels[alertname]=pipelineFailed&labels[pipelineId]=${{ env.PIPELINE_ID }}&labels[system]=skyu&message=Pipeline Failed&messageTitle=Pipeline ${{ env.PIPELINE_ID }} Failed&status=firing"  -H 'Content-Type: application/x-www-form-urlencoded'  "${{ env.FIRE_SKYU_ALERT_EP }}?organizationId=${{ env.PIPELINE_ORGANIZATION_ID }}&projectId=${{ env.PIPELINE_PROJECT_ID }}&environmentId=${{ env.PIPELINE_ENVIRONMENT_ID }}&token=${{ env.SERVICE_ACC_ACCESS_TOKEN_STRIPPED }}&authBy=sa")
-
-              if echo "$response" | grep -q '"success":true'; then
-                echo "SUCCESS :: $response"
-              else
-                echo "FAILED :: $response"
-              fi
-              
-    needs:
-      - code-scan
-      - _status_testing
-      - build-and-release
-      - deploy
-    permissions: write-all
-    if: ${{ failure() || cancelled() }}
-    env:
-      CONTEXT_JSON: ${{ toJson(github) }}
-    runs-on: ubuntu-latest
+    runs-on: macos-15
   deploy:
     name: deploy
     steps:
+      - name: 'Run :: Decoding Secrets'
+        run: |2-
+
+                if [ ! -x "$(command -v jq)" ]; then
+                  echo "jq not found, installing..."
+                  sudo apt-get update
+                  sudo apt-get install -y jq
+                fi
+                echo "${{ env.ENCODED_PIPELINE_SECRET }}" | base64 --decode | jq -r 'to_entries[] | "\(.key)=\(.value)"' | while read line; do echo "$line" >> $GITHUB_ENV; echo "::add-mask::${line#*=}"; done
+                
       - name: 'Run :: Start'
         run: |2-
 
@@ -721,16 +699,6 @@ jobs:
                 echo "Skipping checkout..."
               fi
             
-      - name: 'Run :: Decoding Secrets'
-        run: |2-
-
-                if [ ! -x "$(command -v jq)" ]; then
-                  echo "jq not found, installing..."
-                  sudo apt-get update
-                  sudo apt-get install -y jq
-                fi
-                echo "${{ env.ENCODED_PIPELINE_SECRET }}" | base64 --decode | jq -r 'to_entries[] | "\(.key)=\(.value)"' | while read line; do echo "$line" >> $GITHUB_ENV; echo "::add-mask::${line#*=}"; done
-                
       - name: 'Run :: Deploy and Notify Resource Service'
         env:
           RUN_ID: ${{ github.run_id }}
@@ -765,6 +733,166 @@ jobs:
             
     needs:
       - build-and-release
+      - _status_testing
     permissions: write-all
     if: github.event.client_payload.releaseData == null
+    runs-on: ubuntu-latest
+  _status-success:
+    name: _status-success
+    steps:
+      - name: 'Run :: Decoding Secrets'
+        run: |2-
+
+                if [ ! -x "$(command -v jq)" ]; then
+                  echo "jq not found, installing..."
+                  sudo apt-get update
+                  sudo apt-get install -y jq
+                fi
+                echo "${{ env.ENCODED_PIPELINE_SECRET }}" | base64 --decode | jq -r 'to_entries[] | "\(.key)=\(.value)"' | while read line; do echo "$line" >> $GITHUB_ENV; echo "::add-mask::${line#*=}"; done
+                
+      - name: 'Run :: Start'
+        run: |2-
+
+              echo " Starting GitHub Action!" && 
+              echo "STEPS_CAN_PROCEED=true" >> $GITHUB_ENV
+              
+      - name: 'Run :: Checkout repository'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 'Run :: Checkout Specific Commit'
+        env:
+          COMMIT_ID: ${{ github.event.client_payload.commitId }}
+          BRANCH_NAME: ${{ github.event.client_payload.branchName }}
+        if: >-
+          ${{ github.event.client_payload.commitId != null ||
+          github.event.client_payload.branchName != null }}
+        run: |2-
+
+              echo "Starting the checkout process..."
+              git fetch --all
+              if [ -n "$COMMIT_ID" ]; then
+                echo "Commit ID provided: $COMMIT_ID"
+                git checkout $COMMIT_ID || true
+                echo "Checked out to commit ID: $COMMIT_ID"
+              elif [ -n "$BRANCH_NAME" ]; then
+                echo "Branch name provided: $BRANCH_NAME"
+                git checkout $BRANCH_NAME || true
+                echo "Checked out to branch: $BRANCH_NAME"
+
+                #Updating the commit Id
+                ACTUAL_COMMIT_ID=$(git rev-parse HEAD)
+                echo "Changing CommitId: $ACTUAL_COMMIT_ID"
+                echo "COMMIT_ID=$ACTUAL_COMMIT_ID" >> $GITHUB_ENV
+              else
+                echo "Skipping checkout..."
+              fi
+            
+      - name: 'Run :: Pipeline Success'
+        env:
+          RUN_ID: ${{ github.run_id }}
+        run: |2-
+
+              context=$(echo "$CONTEXT_JSON" | jq --arg sha "$COMMIT_ID" '.sha = $sha' | jq -c . | base64)
+              response=$(curl -X PUT -d "runId=$RUN_ID&context=$context&appId=${{ github.event.client_payload.externalRepo.appId }}"  -H 'Authorization: ${{ env.SERVICE_ACC_ACCESS_TOKEN }}' -H 'x-organization-id: ${{ env.PIPELINE_ORGANIZATION_ID }}' -H 'x-project-id: ${{ env.PIPELINE_PROJECT_ID }}' -H 'x-environment-id: ${{ env.PIPELINE_ENVIRONMENT_ID }}' -H 'x-trace-id: ${{ env.PIPELINE_TRACE_ID }}' -H 'x-auth-by: sa' -H 'Content-Type: application/x-www-form-urlencoded'  "${{ env.PIPELINE_SERVICE_EP }}/${{ env.PIPELINE_ID }}/SUCCESS?releaseId=${{ github.event.client_payload.releaseData.releaseId }}")
+              
+    needs:
+      - code-scan
+      - _status_testing
+      - build-and-release
+      - deploy
+    permissions: write-all
+    if: ${{ !(failure() || cancelled()) }}
+    env:
+      CONTEXT_JSON: ${{ toJson(github) }}
+    runs-on: ubuntu-latest
+  _status-failed:
+    name: _status-failed
+    steps:
+      - name: 'Run :: Decoding Secrets'
+        run: |2-
+
+                if [ ! -x "$(command -v jq)" ]; then
+                  echo "jq not found, installing..."
+                  sudo apt-get update
+                  sudo apt-get install -y jq
+                fi
+                echo "${{ env.ENCODED_PIPELINE_SECRET }}" | base64 --decode | jq -r 'to_entries[] | "\(.key)=\(.value)"' | while read line; do echo "$line" >> $GITHUB_ENV; echo "::add-mask::${line#*=}"; done
+                
+      - name: 'Run :: Pipeline Failed'
+        env:
+          RUN_ID: ${{ github.run_id }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          WF_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        run: |2-
+
+              context=$(echo "$CONTEXT_JSON" | jq --arg sha "$COMMIT_ID" '.sha = $sha' | jq -c . | base64)
+              response=$(curl -X PUT -d "runId=$RUN_ID&context=$context&appId=${{ github.event.client_payload.externalRepo.appId }}"  -H 'Authorization: ${{ env.SERVICE_ACC_ACCESS_TOKEN }}' -H 'x-organization-id: ${{ env.PIPELINE_ORGANIZATION_ID }}' -H 'x-project-id: ${{ env.PIPELINE_PROJECT_ID }}' -H 'x-environment-id: ${{ env.PIPELINE_ENVIRONMENT_ID }}' -H 'x-trace-id: ${{ env.PIPELINE_TRACE_ID }}' -H 'x-auth-by: sa' -H 'Content-Type: application/x-www-form-urlencoded'  "${{ env.PIPELINE_SERVICE_EP }}/${{ env.PIPELINE_ID }}/FAILED?releaseId=${{ github.event.client_payload.releaseData.releaseId }}")
+
+              echo "Collecting workflow status..."
+                
+              JOB_DATA=$(curl -s       -H "Authorization: Bearer $GH_TOKEN"       "https://api.github.com/repos/$REPOSITORY/actions/runs/$RUN_ID/jobs")
+                
+              # FAILED job and step
+              FAILED_JOB=$(echo "$JOB_DATA" | jq -r '
+                .jobs[] | select(.conclusion=="failure") | .name' | head -n 1)
+                
+              FAILED_STEP=$(echo "$JOB_DATA" | jq -r '
+                .jobs[].steps[] | select(.conclusion=="failure") | .name' | head -n 1)
+                
+              # CANCELLED job and step
+              CANCELLED_JOB=$(echo "$JOB_DATA" | jq -r '
+                .jobs[] | select(.conclusion=="cancelled") | .name' | head -n 1)
+                
+              CANCELLED_STEP=$(echo "$JOB_DATA" | jq -r '
+                .jobs[].steps[] | select(.conclusion=="cancelled") | .name' | head -n 1)
+                
+              FAILED_MESSAGE=""
+                
+              if [ "$WF_CONCLUSION" = "cancelled" ]; then
+                # Workflow cancelled
+                if [ -n "$CANCELLED_JOB" ] && [ -n "$CANCELLED_STEP" ]; then
+                    FAILED_MESSAGE="Workflow was cancelled while executing '$CANCELLED_STEP' step from '$CANCELLED_JOB' job"
+                else
+                    FAILED_MESSAGE="Workflow was cancelled"
+                fi
+
+              else
+                # Workflow failed
+                if [ -n "$FAILED_JOB" ] && [ -n "$FAILED_STEP" ]; then
+                    FAILED_MESSAGE="Workflow failed while executing '$FAILED_STEP' step from '$FAILED_JOB' job"
+                else
+                    FAILED_MESSAGE="Workflow failed"
+                fi
+              fi
+
+              # ALERT TITLE BUILD
+              if [ -n "${{ env.APPLICATION_NAME }}" ]; then
+                  ALERT_TITLE="${{ env.APPLICATION_NAME }} Pipeline Failed"
+              else
+                  ALERT_TITLE="Pipeline ${{ env.PIPELINE_ID }} Failed"
+              fi
+
+              # Triggering SkyU Alerts
+              echo "ALERT TITLE :: $ALERT_TITLE"
+              echo "ALERT MESSAGE :: $FAILED_MESSAGE"
+
+              response=$(curl -X POST -d "labels[alertname]=pipelineFailed&labels[repository]=$REPOSITORY&labels[applicationName]=${{ env.APPLICATION_NAME }}&labels[applicationId]=${{ env.PIPELINE_APPLICATION_ID }}&labels[envLabel]=${{ env.PIPELINE_ENVIRONMENT_LABEL }}&labels[pipelineId]=${{ env.PIPELINE_ID }}&labels[system]=skyu&messageTitle=$ALERT_TITLE&message=$FAILED_MESSAGE&status=firing"  -H 'Content-Type: application/x-www-form-urlencoded'  "${{ env.FIRE_SKYU_ALERT_EP }}?organizationId=${{ env.PIPELINE_ORGANIZATION_ID }}&projectId=${{ env.PIPELINE_PROJECT_ID }}&environmentId=${{ env.PIPELINE_ENVIRONMENT_ID }}&token=${{ env.SERVICE_ACC_ACCESS_TOKEN_STRIPPED }}&authBy=sa")
+
+              if echo "$response" | grep -q '"success":true'; then
+                echo "SUCCESS :: $response"
+              else
+                echo "FAILED :: $response"
+              fi
+              
+    needs:
+      - code-scan
+      - _status_testing
+      - build-and-release
+      - deploy
+    permissions: write-all
+    if: ${{ failure() || cancelled() }}
+    env:
+      CONTEXT_JSON: ${{ toJson(github) }}
     runs-on: ubuntu-latest
